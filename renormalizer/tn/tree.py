@@ -140,13 +140,14 @@ class TTNO(TTNBase):
 
         if not root:
             self.symbolic_ttno, mpoqn = construct_symbolic_ttno(basis, terms, algo=algo)
+            operator_dtype = backend.complex_dtype if any(np.iscomplexobj(term.factor) for term in terms) else backend.real_dtype
             # from renormalizer.mps.symbolic_mpo import _format_symbolic_mpo
             # print(_format_symbolic_mpo(symbolic_mpo))
             node_list_basis = self.basis.postorder_list()
             node_list_op = []
             for impo, (mo, qn) in enumerate(zip(self.symbolic_ttno, mpoqn)):
                 node_basis: TreeNodeBasis = node_list_basis[impo]
-                mo_mat = symbolic_mo_to_numeric_mo_general(node_basis.basis_sets, mo, backend.real_dtype)
+                mo_mat = symbolic_mo_to_numeric_mo_general(node_basis.basis_sets, mo, operator_dtype)
                 node_list_op.append(TreeNodeTensor(mo_mat, qn))
             root: TreeNodeTensor = copy_connection(node_list_basis, node_list_op)
         super().__init__(basis, root)

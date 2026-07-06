@@ -30,3 +30,5 @@ build/
 dist/
 *egg-info/
 .coverage*
+
+*.csv
