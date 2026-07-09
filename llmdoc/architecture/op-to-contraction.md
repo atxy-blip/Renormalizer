@@ -23,6 +23,14 @@ Op("+ Z -", ["L_0", "s^", "R_0"], factor=0.2)
 
 `Op` 设计上主要处理乘法，不直接把加法塞进一个对象。加法返回 `OpSum`，本质是 `list[Op]`。
 
+在 SOP benchmark 里，`n_sop_terms` 数的是 Hamiltonian 被化成：
+
+```text
+H = sum_alpha H_alpha
+```
+
+之后的 product `Op` 项数。它不是 TTNS site 数，也不是 local basis 维数。一个 `Op` product term 可以跨多个 dof，例如含有 lead hopping 和 fermionic `Z` string；在 TTNS 上它会再被 split 到多个 tree node 的 local operator。
+
 ## 2. Op 乘法与 OpSum
 
 `Op.product()` / `Op.__mul__()` 的逻辑是：
@@ -141,10 +149,11 @@ SOPTerm(
 
 缺失的 node 表示 identity。
 
-当前 apply 逻辑：
+当前 no-env apply 逻辑：
 
 ```text
 apply_to_ttns(psi)
+  -> apply_to_ttns_no_env(psi)
   for each SOPTerm:
       _apply_term_to_ttns(term, psi)
       result = result.add(term_psi)
@@ -159,6 +168,13 @@ apply_to_ttns(psi)
 - 更新 qn metadata。
 
 这条路径没有 contraction environment。它只是避免了 per-term TTNO construction，并缓存了 local matrix factor。
+
+整理后的 API 约定：
+
+- `apply_to_ttns(psi)` 默认等价于 `method="sop_no_env"`。
+- `apply_to_ttns(psi, method="sop_no_env")` 和 `apply_to_ttns_no_env(psi)` 是当前 naive baseline。
+- `method="no_env"` 是短别名。
+- `method="sop_with_env"` / `"with_env"` 在真正实现前必须明确抛出 `NotImplementedError`，避免 benchmark 误把 no-env 路径标成 with-env。
 
 ## 8. Op 到 contraction environment
 
@@ -178,7 +194,15 @@ TTNO terms
 - TTNO branch
 - ket branch
 
-SOP-with-env 还没有实现。合理方向是：
+full-state `SOPBaselineOperator.apply_to_ttns(..., method="sop_with_env")` 仍未实现，必须继续抛出 `NotImplementedError`，避免误标 benchmark。
+
+当前 adaptive benchmark 已实现 one-site local effective action 版本：
+
+```text
+benchmarks/benchmark_adaptive_operator_env.py::SOPOneSiteEffective
+```
+
+它的逻辑是：
 
 ```text
 SOP terms
@@ -188,3 +212,51 @@ SOP terms
 ```
 
 这样可以保留 flat SOP 表示，同时减少不同 product terms 之间重复 contraction state tree 的开销。
+
+注意这里的 environment 是 contraction cache，不是 lead/phonon bath。它减少 state tree 上 branch contraction 的重复；TTNO 进一步通过 operator bond 压缩 SOP terms 之间重复的 operator structure。
+
+## 9. 本 benchmark 中 `n_sop_terms` 的具体含义
+
+`benchmarks/benchmark_adaptive_operator_env.py::build_hubbard_junction_case()` 构造 Hubbard junction term list。
+
+每个 `n_lead` 生成四组 fermionic lead modes：
+
+```text
+L_i, L^i, R_i, R^i
+```
+
+所以 lead mode 总数是 `4 * n_lead`。每个 lead mode 对 Hamiltonian 贡献 3 个 product `Op`：
+
+```text
+1. c^\dagger c
+2. c^\dagger Z... d
+3. c Z... d^\dagger
+```
+
+因此 lead 部分 SOP term count 是：
+
+```text
+12 * n_lead
+```
+
+每个 phonon mode 贡献：
+
+```text
+p^2, x^2, n_{s^} x, n_{s_} x
+```
+
+即 `4 * n_phonon` 个 product terms。默认 `ed=0` 和 `ud=0`，bridge onsite / Hubbard U 项被 simplify 后不计数。因此当前 benchmark：
+
+```text
+n_sop_terms = 12 * n_lead + 4 * n_phonon
+```
+
+例子：
+
+```text
+n_lead=128, n_phonon=0:
+  n_sop_terms = 1536
+
+n_lead=64, n_phonon=16:
+  n_sop_terms = 832
+```

@@ -24,5 +24,14 @@
 
 - `TTNO.apply()` 利用 TTNO operator bond 结构，但不是 `TTNEnviron` 路径。
 - TDVP / ground-state local effective Hamiltonian 路径已有 `TTNEnviron`。
-- 当前 `SOPBaselineOperator.apply_to_ttns()` 没有 contraction environment，只做 local matrix cache。
-- 因此当前 benchmark 只覆盖 flat SOP vs TTNO apply，还没有覆盖 fair `sop_with_env`。
+- 当前 `SOPBaselineOperator.apply_to_ttns()` 默认走 `sop_no_env`，显式入口是 `apply_to_ttns_no_env()`；它没有 contraction environment，只做 local matrix cache。
+- full-state `SOPBaselineOperator.apply_to_ttns(..., method="sop_with_env")` 仍未实现，并应继续抛出 `NotImplementedError`，避免把 no-env 误标成 with-env。
+- 当前 adaptive benchmark 已实现 one-site local effective Hamiltonian action 版本的 `sop_with_env`，用 branch signature cache 跨 SOP terms 复用 contraction environment。
+
+当前正式 benchmark 解释口径：
+
+- `lead_only`：固定 `n_phonon=0`，扫描 `n_lead`，用于隔离 fermionic lead mode 增长。
+- `balanced_lead_phonon`：同时增加 `n_lead` 和 `n_phonon`，用于更接近 molecular junction 整体变大。
+- `n_total_sites = 4 * n_lead + 2 + n_phonon`，是 TTNS/TTNO 物理自由度 site 数。
+- `n_sop_terms = 12 * n_lead + 4 * n_phonon`，是 Hamiltonian 的 SOP product term 数，不是 site 数或 basis 维数。
+- `alpha` 是 `t(N)=C*N^alpha` 的 log-log wall-time scaling exponent，必须说明横轴是 `n_total_sites` 还是 `n_sop_terms`。

@@ -49,6 +49,33 @@ def test_sop_apply_does_not_construct_term_ttnos(monkeypatch):
     np.testing.assert_allclose(result.todense(basis_list).ravel(), ref.todense(basis_list).ravel(), atol=1e-12)
 
 
+def test_sop_apply_has_explicit_no_env_entrypoint():
+    basis_list = [BasisHalfSpin(i) for i in range(3)]
+    tree = BasisTree.binary(basis_list)
+    terms = [Op("X", 0, 0.5), Op("Z X", [0, 2], 0.2)]
+    psi = TTNS.random(tree, qntot=0, m_max=4).to_complex()
+    sop = SOPBaselineOperator.from_symbolic_terms(terms, tree)
+
+    default = sop.apply_to_ttns(psi).todense(basis_list)
+    explicit = sop.apply_to_ttns_no_env(psi).todense(basis_list)
+    by_method = sop.apply_to_ttns(psi, method="sop_no_env").todense(basis_list)
+    by_short_method = sop.apply_to_ttns(psi, method="no_env").todense(basis_list)
+
+    np.testing.assert_allclose(explicit, default, atol=1e-12)
+    np.testing.assert_allclose(by_method, default, atol=1e-12)
+    np.testing.assert_allclose(by_short_method, default, atol=1e-12)
+
+
+def test_sop_apply_rejects_with_env_until_implemented():
+    basis_list = [BasisHalfSpin(i) for i in range(2)]
+    tree = BasisTree.binary(basis_list)
+    psi = TTNS(tree, condition={})
+    sop = SOPBaselineOperator.from_symbolic_terms([Op("X", 0, 0.5)], tree)
+
+    with pytest.raises(NotImplementedError, match="sop_with_env"):
+        sop.apply_to_ttns(psi, method="sop_with_env")
+
+
 def test_identity_only_sop_scales_state_without_local_work():
     basis_list = [BasisHalfSpin(i) for i in range(3)]
     tree = BasisTree.binary(basis_list)

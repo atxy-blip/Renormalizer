@@ -78,9 +78,9 @@ for snode, new_snode, onode in zip(ttns, new, ttno):
 
 它利用 TTNO operator bond 的压缩结构，但没有构造 `TTNEnviron`，也不是 active-node local effective Hamiltonian。
 
-## 当前 SOP baseline 的缺口
+## 当前 SOP baseline 的状态
 
-`SOPBaselineOperator.apply_to_ttns()` 逐 term 调 `_apply_term_to_ttns()`：
+`SOPBaselineOperator.apply_to_ttns()` 当前默认 dispatch 到 `apply_to_ttns_no_env()`，后者逐 term 调 `_apply_term_to_ttns()`：
 
 - 每个 product term 独立遍历整棵 TTNS。
 - 仅缓存 `(node_idx, op.to_tuple()) -> local matrix factors`。
@@ -88,6 +88,23 @@ for snode, new_snode, onode in zip(ttns, new, ttno):
 - 不跨 product terms 复用 state-tree contraction boundary。
 
 因此它应归类为 `sop_no_env`。
+
+full-state `method="sop_with_env"` 当前仍未实现，并应明确抛出 `NotImplementedError`。
+
+benchmark 里的 `sop_with_env` 是一个 one-site local effective Hamiltonian action 最小实现，位置：
+
+```text
+benchmarks/benchmark_adaptive_operator_env.py::SOPOneSiteEffective
+```
+
+复用粒度：
+
+- active node 的每个 child branch；
+- branch root index；
+- branch subtree 上非 identity local `Op` 的 signature；
+- 相同 branch signature 的 SOP terms 共享同一个 precontracted branch environment。
+
+这能测试导师关心的 contraction-environment 效应，但它不是完整 TDVP sweep 或 full-state `H|psi>` implementation。
 
 ## 可复用但不能直接照搬的部分
 

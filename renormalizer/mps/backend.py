@@ -24,10 +24,15 @@ GPU_KEY = "RENO_GPU"
 USE_GPU = False
 
 GPU_ID = os.environ.get(GPU_KEY, None)
+GPU_DISABLED_VALUES = {"cpu", "off", "false", "none", "no"}
 
 
 def try_import_cupy():
     global GPU_ID
+
+    if GPU_ID is not None and GPU_ID.lower() in GPU_DISABLED_VALUES:
+        logger.info(f"{GPU_KEY}={GPU_ID!r}; skip CuPy initialization")
+        return False, np
 
     try:
         import cupy as cp

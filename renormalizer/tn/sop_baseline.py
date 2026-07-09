@@ -18,6 +18,17 @@ from renormalizer.mps.backend import np
 from renormalizer.tn.treebase import BasisTree
 
 
+SOP_APPLY_NO_ENV = "sop_no_env"
+SOP_APPLY_WITH_ENV = "sop_with_env"
+
+_SOP_APPLY_METHOD_ALIASES = {
+    SOP_APPLY_NO_ENV: SOP_APPLY_NO_ENV,
+    "no_env": SOP_APPLY_NO_ENV,
+    SOP_APPLY_WITH_ENV: SOP_APPLY_WITH_ENV,
+    "with_env": SOP_APPLY_WITH_ENV,
+}
+
+
 @dataclass(frozen=True)
 class SOPTerm:
     """Single flattened SOP product term.
@@ -130,8 +141,26 @@ class SOPBaselineOperator:
                 total += local_dim * local_dim
         return int(total)
 
-    def apply_to_ttns(self, psi):
-        """Apply the SOP operator to ``psi`` by summing independent term actions."""
+    def apply_to_ttns(self, psi, method: str = SOP_APPLY_NO_ENV):
+        """Apply the SOP operator to ``psi`` with an explicitly selected path.
+
+        ``sop_no_env`` is the current flat term-by-term baseline.  It does not
+        construct contraction environments and is kept separate so benchmarks do
+        not accidentally label it as an environment-reusing SOP path.
+        """
+
+        method = _normalize_apply_method(method)
+        if method == SOP_APPLY_NO_ENV:
+            return self.apply_to_ttns_no_env(psi)
+        if method == SOP_APPLY_WITH_ENV:
+            raise NotImplementedError(
+                "sop_with_env is not implemented yet. Use sop_no_env for the "
+                "current flat term-by-term baseline."
+            )
+        raise AssertionError(f"Unhandled SOP apply method {method}")
+
+    def apply_to_ttns_no_env(self, psi):
+        """Apply SOP by summing independent product-term actions, without environments."""
 
         result = None
         for term in self.terms:
@@ -144,10 +173,10 @@ class SOPBaselineOperator:
             return psi.scale(0)
         return result
 
-    def expectation(self, psi):
-        """Compute ``<psi|O|psi>`` without constructing a compressed TTNO."""
+    def expectation(self, psi, method: str = SOP_APPLY_NO_ENV):
+        """Compute ``<psi|O|psi>`` through the selected SOP application path."""
 
-        return self.apply_to_ttns(psi).overlap(psi)
+        return self.apply_to_ttns(psi, method=method).overlap(psi)
 
     def to_dense_small_system(self, order: Optional[List] = None):
         """Convert the flat SOP operator to a dense matrix for tiny tests only."""
@@ -262,6 +291,16 @@ def _split_op_by_tree_node(op: Op, basis: BasisTree) -> Tuple[Dict[int, Op], Uni
         else:
             local_ops[node_idx] = elementary_op
     return local_ops, coeff
+
+
+def _normalize_apply_method(method: str) -> str:
+    try:
+        return _SOP_APPLY_METHOD_ALIASES[method]
+    except KeyError as exc:
+        supported = ", ".join(sorted(_SOP_APPLY_METHOD_ALIASES))
+        raise ValueError(
+            f"Unknown SOP apply method {method!r}. Supported methods: {supported}"
+        ) from exc
 
 
 def _apply_matrix_on_axis(tensor: np.ndarray, mat: np.ndarray, axis: int) -> np.ndarray:
