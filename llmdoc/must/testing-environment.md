@@ -91,6 +91,15 @@ profile：
 - `RUN_PROFILE=medium`：服务器中等规模趋势检查；
 - `RUN_PROFILE=large`：服务器大尺寸 log-log fitting。
 
+可用环境变量选择 timing object：
+
+```bash
+ACTIVE_SCOPE=root      # root one-site local effective Hamiltonian action
+ACTIVE_SCOPE=all_nodes # all-node sweep-like collection of one-site actions
+```
+
+strict MCTDH-like SOP baseline 的 scaling 诊断应使用 `ACTIVE_SCOPE=all_nodes`。root-only benchmark 不能用来验证 no-env `N^3`。
+
 最近一次 sanity 记录：
 
 ```text
@@ -103,4 +112,22 @@ raw_rows: 12
 max_relative_error_vs_ttno: about 8e-16
 raw_csv: benchmarks/results/adaptive_operator_env/sanity_114123_raw.csv
 fit_csv: benchmarks/results/adaptive_operator_env/sanity_114123_fits.csv
+```
+
+strict MCTDH-like all-nodes sanity 记录：
+
+```text
+job_id: 114334
+node: curie-cpu011
+status: COMPLETED
+exit_code: 0:0
+active_scope: all_nodes
+scaling_path: lead_only
+lead_values: 1 2 4 8
+result:
+  sop_no_env                  large-only alpha vs n_lead ~= 3.02
+  sop_mctdh_like_state_env    large-only alpha vs n_lead ~= 2.03
+  ttno_with_env               large-only alpha vs n_lead ~= 1.01
+raw_csv: benchmarks/results/adaptive_operator_env/sanity_114334_raw.csv
+fit_csv: benchmarks/results/adaptive_operator_env/sanity_114334_fits.csv
 ```

@@ -2,20 +2,27 @@
 
 老师的问题是：当前 SOP baseline 是否因为没有 contraction environment 而过慢，从而不公平地放大了 flat SOP 的重复缩并开销。
 
-需要清楚区分三条路径：
+需要清楚区分四条路径：
 
 1. `sop_no_env`
    - 保留 flat SOP term-by-term 逻辑。
    - 不构造 contraction environment。
    - 用来展示 naive product-term traversal 的重复开销。
 
-2. `sop_with_env`
+2. `sop_mctdh_like_state_env`
+   - Hamiltonian 仍表示为 flat SOP term list。
+   - 逐 SOP product term 处理，不把多个 terms 压缩为 TTNO/MPO。
+   - 对整棵 TTNS tree 构造 per-term directed-edge state environment / mean-field-like message。
+   - 不跨 SOP terms 合并相同 operator subtree。
+   - 这是 strict MCTDH-like SOP baseline。
+
+3. `sop_env_plus_operator_cache`
    - Hamiltonian 仍表示为 SOP term list。
    - 对 active node / active subtree 的外部 branch 预构造 environment。
    - 不同 SOP terms 在相同 branch/operator signature 上复用环境。
-   - 这是更接近 ML-MCTDH local mean-field / effective Hamiltonian 思路的 baseline。
+   - 这是优化版 SOP baseline，包含 operator-structure reuse，不能直接代表 Heidelberg MCTDH-like SOP baseline。
 
-3. `ttno_with_env`
+4. `ttno_with_env`
    - Hamiltonian 先压缩为 TTNO。
    - TTNO bond 共享不同 product terms 的公共 operator structure。
    - TDVP / ground-state local update 使用 `TTNEnviron` 和 `hop_expr1/2`。
@@ -26,7 +33,10 @@
 - TDVP / ground-state local effective Hamiltonian 路径已有 `TTNEnviron`。
 - 当前 `SOPBaselineOperator.apply_to_ttns()` 默认走 `sop_no_env`，显式入口是 `apply_to_ttns_no_env()`；它没有 contraction environment，只做 local matrix cache。
 - full-state `SOPBaselineOperator.apply_to_ttns(..., method="sop_with_env")` 仍未实现，并应继续抛出 `NotImplementedError`，避免把 no-env 误标成 with-env。
-- 当前 adaptive benchmark 已实现 one-site local effective Hamiltonian action 版本的 `sop_with_env`，用 branch signature cache 跨 SOP terms 复用 contraction environment。
+- 当前 adaptive benchmark 支持 `active_scope=root` 和 `active_scope=all_nodes`。
+- `active_scope=root` 只测 root one-site local effective Hamiltonian action。此时 `sop_no_env` 预期是 `n_sop_terms * n_tree ~ N^2`，不能用来验证 no-env `N^3`。
+- `active_scope=all_nodes` 测所有 TTNS node 的 one-site local effective action，接近 sweep / propagation kernel 的缩并对象。此时 naive no-env 预期为 `n_active_nodes * n_sop_terms * n_tree ~ N^3`。
+- 当前 strict MCTDH-like path 是 `benchmarks/benchmark_adaptive_operator_env.py::SOPMCTDHSweepEnvironment`。它按 `(source_node_idx, target_node_idx, term_index)` 缓存 directed-edge message，不做 operator signature sharing。
 
 当前正式 benchmark 解释口径：
 
@@ -35,3 +45,15 @@
 - `n_total_sites = 4 * n_lead + 2 + n_phonon`，是 TTNS/TTNO 物理自由度 site 数。
 - `n_sop_terms = 12 * n_lead + 4 * n_phonon`，是 Hamiltonian 的 SOP product term 数，不是 site 数或 basis 维数。
 - `alpha` 是 `t(N)=C*N^alpha` 的 log-log wall-time scaling exponent，必须说明横轴是 `n_total_sites` 还是 `n_sop_terms`。
+- 报告 `alpha` 时也必须说明 timing object：`quantity=local_effective_1site_apply` 或 `quantity=local_effective_1site_apply_all_nodes`。
+
+当前理论 / 实测口径：
+
+```text
+all_nodes, fit vs n_lead, large-only:
+  sop_no_env                  ~= 3
+  sop_mctdh_like_state_env    ~= 2
+  ttno_with_env               ~= 1
+```
+
+`sop_env_plus_operator_cache` 目前是 per-active-node branch signature cache path，不是完整 sweep-level operator-cache baseline。

@@ -1,9 +1,12 @@
 # SOP Environment Benchmark 实现流程
 
-目标是实现并 benchmark 三条路径：
+目标是实现并 benchmark 四条路径：
 
 ```text
-sop_no_env -> sop_with_env -> ttno_with_env
+sop_no_env
+sop_mctdh_like_state_env
+sop_env_plus_operator_cache
+ttno_with_env
 ```
 
 不要把物理 bath/lead/phonon environment 与 contraction environment 混淆。
@@ -44,6 +47,51 @@ apply_sop_one_site_env(env, active_tensor)
 - 多个 SOP terms 有相同 branch signature 时复用同一个 environment tensor。
 
 第一版只支持 one-site active node。two-site active subtree 和完整 full-state `H|psi>` SOP-with-env 可后续扩展。
+
+注意：branch signature cache 不是 strict MCTDH-like baseline。它会把相同 operator subtree 的不同 SOP terms 合并为一个 cached branch environment，应标为：
+
+```text
+sop_env_plus_operator_cache
+```
+
+## Step 2.1：strict MCTDH-like all-nodes state environment
+
+导师预期的 fair SOP/MCTDH-like baseline 需要保留 flat SOP term structure，但在一次 sweep-like all-nodes 计算中复用 state/mean-field environment。
+
+当前实现位置：
+
+```text
+benchmarks/benchmark_adaptive_operator_env.py::SOPMCTDHSweepEnvironment
+```
+
+构造规则：
+
+- 对每个 SOP term 单独处理；
+- 对每条 tree edge 构造两个方向的 message；
+- cache key 为 `(source_node_idx, target_node_idx, term_index)`；
+- 不使用 branch operator signature；
+- 不使用 TTNO/MPO operator bond；
+- 不跨 product terms 合并相同 operator structure。
+
+all-nodes 下应满足：
+
+```text
+n_env_cache_entries = n_sop_terms * 2 * (n_active_nodes - 1)
+```
+
+这个 invariant 由测试固定：
+
+```text
+renormalizer/tn/tests/test_adaptive_operator_env_benchmark.py::test_strict_mctdh_state_env_reuses_term_messages_across_active_nodes
+```
+
+复杂度口径：
+
+```text
+sop_no_env(all_nodes)               ~ n_active_nodes * n_sop_terms * n_tree ~ N^3
+sop_mctdh_like_state_env(all_nodes) ~ n_sop_terms * n_tree                  ~ N^2
+ttno_with_env(all_nodes)            ~ N, if TTNO bond stays bounded
+```
 
 ## Step 3：TTNO-with-env wrapper
 
@@ -115,9 +163,12 @@ method 固定为：
 
 ```text
 sop_no_env
-sop_with_env
+sop_mctdh_like_state_env
+sop_env_plus_operator_cache
 ttno_with_env
 ```
+
+`sop_with_env` 是旧的 ambiguous label。新 benchmark 中不应把它作为正式报告 label。
 
 ## Step 5.1：scaling path、basis 和 Hamiltonian term count
 
@@ -253,7 +304,7 @@ benchmarks/plot_operator_env_scaling.py
 
 其中 `*_formal_mean_fits.csv` 是按每个尺寸先取 mean/std 再拟合，适合用于文字解释和图注。
 
-`large_114126` 的 mean-per-size large-only 结果：
+历史 root-only benchmark (`large_114126`) 的 mean-per-size large-only 结果：
 
 ```text
 lead_only, alpha vs n_total_sites:
@@ -267,11 +318,34 @@ balanced_lead_phonon, alpha vs n_total_sites:
   ttno_with_env   1.000
 ```
 
-这支持的解释是：
+这些结果只适合解释 root one-site kernel。因为 root-only `sop_no_env` 理论上就是：
 
 ```text
-Environment construction removes repeated contractions over the state tree,
-while TTNO additionally removes repeated operator-structure redundancy across SOP terms.
+n_sop_terms * n_tree ~ N^2
+```
+
+因此不能拿 root-only 结果验证 no-env `N^3`。
+
+strict MCTDH-like all-nodes sanity (`n_lead=1,2,4,8`) 的关键结果：
+
+```text
+fit vs n_lead, large-only:
+  sop_no_env                  3.02
+  sop_mctdh_like_state_env    2.03
+  sop_env_plus_operator_cache 2.43
+  ttno_with_env               1.01
+```
+
+解释口径：
+
+```text
+active_scope=root:
+  root one-site kernel; no-env expected ~ N^2
+
+active_scope=all_nodes:
+  sweep-like collection of one-site kernels; no-env expected ~ N^3
+  strict MCTDH-like state env expected ~ N^2
+  TTNO with bounded operator bond expected ~ N
 ```
 
 ## Step 6：Slurm CPU benchmark
@@ -297,6 +371,21 @@ RUN_PROFILE=large sbatch benchmarks/scripts/curie_cpu_adaptive_operator_env.sbat
 ```
 
 脚本固定 CPU backend：`RENO_GPU=cpu`、`RENO_NUM_THREADS=1`、`OMP_NUM_THREADS=1`、`MKL_NUM_THREADS=1`、`OPENBLAS_NUM_THREADS=1`。
+
+选择 timing object：
+
+```bash
+ACTIVE_SCOPE=root      # root one-site kernel
+ACTIVE_SCOPE=all_nodes # sweep-like all-node local effective action
+```
+
+strict MCTDH-like scaling 诊断应使用：
+
+```bash
+ACTIVE_SCOPE=all_nodes SCALING_PATH=lead_only RUN_PROFILE=sanity \
+LEAD_VALUES="1 2 4 8" REPEATS=1 MAX_EXTRA_POINTS=0 \
+sbatch benchmarks/scripts/curie_cpu_adaptive_operator_env.sbatch
+```
 
 输出：
 

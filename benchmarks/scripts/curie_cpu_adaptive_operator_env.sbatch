@@ -31,6 +31,8 @@ export MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/matplotlib-${USER}}
 
 REPO_DIR=${REPO_DIR:-/curie-home/yuxiong/Reno-quantity}
 RUN_PROFILE=${RUN_PROFILE:-sanity}
+SCALING_PATH=${SCALING_PATH:-all}
+ACTIVE_SCOPE=${ACTIVE_SCOPE:-root}
 cd "$REPO_DIR"
 
 mkdir -p benchmarks/results/slurm_logs benchmarks/results/adaptive_operator_env
@@ -79,10 +81,12 @@ echo "Python: $(which python)"
 python --version
 echo "LEAD_VALUES=$LEAD_VALUES"
 echo "BALANCED_PAIRS=$BALANCED_PAIRS"
+echo "SCALING_PATH=$SCALING_PATH"
 echo "REPEATS=$REPEATS"
 echo "TIMEOUT_SEC=$TIMEOUT_SEC"
 echo "MEMORY_LIMIT_MB=$MEMORY_LIMIT_MB"
 echo "MAX_EXTRA_POINTS=$MAX_EXTRA_POINTS"
+echo "ACTIVE_SCOPE=$ACTIVE_SCOPE"
 echo "RENO_NUM_THREADS=$RENO_NUM_THREADS"
 echo "RENO_GPU=$RENO_GPU"
 echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
@@ -92,13 +96,14 @@ echo "Started: $(date)"
 echo "=================================================="
 
 python -u benchmarks/benchmark_adaptive_operator_env.py \
-    --scaling-path all \
+    --scaling-path "$SCALING_PATH" \
     --lead-values "$LEAD_VALUES" \
     --balanced-pairs "$BALANCED_PAIRS" \
     --repeats "$REPEATS" \
     --timeout-sec "$TIMEOUT_SEC" \
     --memory-limit-mb "$MEMORY_LIMIT_MB" \
     --max-extra-points "$MAX_EXTRA_POINTS" \
+    --active-scope "$ACTIVE_SCOPE" \
     --output "$RAW_OUT" \
     --fit-output "$FIT_OUT"
 

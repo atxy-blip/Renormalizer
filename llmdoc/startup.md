@@ -25,8 +25,14 @@ conda run -n reno-3.9 python -m pytest renormalizer/tn/tests/test_sop_baseline.p
 本分支的核心问题不是简单证明 TTNO 比 SOP 快，而是区分效率来源：
 
 1. `sop_no_env`：flat SOP term-by-term，不构造 contraction environment。
-2. `sop_with_env`：flat SOP 表示仍保留，但 local update / effective Hamiltonian 使用 branch contraction environment。
-3. `ttno_with_env`：TTNO 压缩 operator structure，并使用 TTN contraction environment。
+2. `sop_mctdh_like_state_env`：strict MCTDH-like SOP baseline，按 SOP term 构造 sweep-level directed-edge state environment，不共享 operator structure。
+3. `sop_env_plus_operator_cache`：优化版 SOP baseline，额外使用 branch/operator signature cache。
+4. `ttno_with_env`：TTNO 压缩 operator structure，并使用 TTN contraction environment。
+
+scaling 解释必须区分 timing object：
+
+- `active_scope=root`：root one-site kernel，no-env 预期约 `N^2`。
+- `active_scope=all_nodes`：sweep-like all-node local actions，no-env 预期约 `N^3`，strict MCTDH-like state env 预期约 `N^2`。
 
 继续实现前，应先读：
 

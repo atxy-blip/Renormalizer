@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Adaptive CPU benchmark for SOP/TTNO environment paths.
 
-The measured quantity is one-site local effective Hamiltonian action at the
-TTNS root.  This is intentional: contraction environments are local-update
-objects, while full-state ``H|psi>`` is kept for small correctness checks only.
+The measured quantity is one-site local effective Hamiltonian action, either at
+the TTNS root or over all TTNS nodes.  This is intentional: contraction
+environments are local-update objects, while full-state ``H|psi>`` is kept for
+small correctness checks only.
 """
 
 import argparse
@@ -46,7 +47,23 @@ import numpy as onp
 
 RNG_SEED = 202407
 RESULT_DIR = Path(__file__).resolve().parent / "results"
-METHODS = ("sop_no_env", "sop_with_env", "ttno_with_env")
+SOP_CACHE_NONE = "none"
+SOP_CACHE_TERM = "term"
+SOP_CACHE_SIGNATURE = "signature"
+
+SOP_METHOD_CACHE_MODE = {
+    "sop_no_env": SOP_CACHE_NONE,
+    "sop_mctdh_like_state_env": SOP_CACHE_TERM,
+    "sop_env_plus_operator_cache": SOP_CACHE_SIGNATURE,
+    "sop_with_env": SOP_CACHE_SIGNATURE,
+}
+
+METHODS = (
+    "sop_no_env",
+    "sop_mctdh_like_state_env",
+    "sop_env_plus_operator_cache",
+    "ttno_with_env",
+)
 RAW_FIELDS = [
     "case_name",
     "scaling_path",
@@ -56,6 +73,11 @@ RAW_FIELDS = [
     "n_boson_sites",
     "n_total_sites",
     "n_sop_terms",
+    "n_active_nodes",
+    "tree_depth",
+    "n_sop_terms_times_n_total_sites",
+    "n_sop_terms_times_n_active_nodes",
+    "n_sop_terms_times_tree_depth",
     "ttno_max_bond",
     "ttno_mean_bond",
     "state_max_bond",
@@ -66,8 +88,10 @@ RAW_FIELDS = [
     "repeat_id",
     "time_env_build_sec",
     "time_expr_build_sec",
+    "time_term_loop_sec",
     "time_apply_sec",
     "time_total_sec",
+    "n_env_cache_entries",
     "memory_peak_mb",
     "relative_error_vs_ttno",
     "backend",
@@ -280,17 +304,29 @@ class SOPOneSiteEffective:
                 items.append((idx, op.to_tuple()))
         return tuple(items)
 
-    def build_env_cache(self):
-        for term in self.sop.terms:
-            for child in self.active_node.children:
-                key = (self.ttns.node_idx[child], self.branch_signature(child, term))
-                if key not in self._env_cache:
-                    self._env_cache[key] = self._contract_subtree(child, term, use_cache=True)
+    def _cache_key(self, child, term, term_index: int, cache_mode: str):
+        child_idx = self.ttns.node_idx[child]
+        if cache_mode == SOP_CACHE_TERM:
+            return child_idx, term_index
+        if cache_mode == SOP_CACHE_SIGNATURE:
+            return child_idx, self.branch_signature(child, term)
+        raise ValueError(f"Unsupported SOP cache mode {cache_mode!r}")
 
-    def apply(self, use_env: bool):
+    def build_env_cache(self, cache_mode: str = SOP_CACHE_SIGNATURE):
+        if cache_mode == SOP_CACHE_NONE:
+            return
+        for term_index, term in enumerate(self.sop.terms):
+            for child in self.active_node.children:
+                key = self._cache_key(child, term, term_index, cache_mode)
+                if key not in self._env_cache:
+                    self._env_cache[key] = self._contract_subtree(child, term, term_index, cache_mode)
+
+    def apply(self, use_env: bool = None, cache_mode: str = None):
+        if cache_mode is None:
+            cache_mode = SOP_CACHE_SIGNATURE if use_env else SOP_CACHE_NONE
         result = np.zeros_like(self.active_node.tensor)
-        for term in self.sop.terms:
-            result = result + self._apply_term(term, use_env=use_env)
+        for term_index, term in enumerate(self.sop.terms):
+            result = result + self._apply_term(term, term_index, cache_mode)
         return result
 
     def _subtree_postorder(self, node):
@@ -300,15 +336,20 @@ class SOPOneSiteEffective:
         nodes.append(node)
         return nodes
 
-    def _branch_env(self, child, term, use_cache: bool):
-        if not use_cache:
-            return self._contract_subtree(child, term, use_cache=False)
-        key = (self.ttns.node_idx[child], self.branch_signature(child, term))
+    def _branch_env(self, child, term, term_index: int, cache_mode: str):
+        if cache_mode == SOP_CACHE_NONE:
+            return self._contract_subtree(child, term, term_index, SOP_CACHE_NONE)
+        key = self._cache_key(child, term, term_index, cache_mode)
         if key not in self._env_cache:
-            self._env_cache[key] = self._contract_subtree(child, term, use_cache=True)
+            self._env_cache[key] = self._contract_subtree(child, term, term_index, cache_mode)
         return self._env_cache[key]
 
-    def _contract_subtree(self, node, term, use_cache: bool):
+    def _parent_env(self, node, term, term_index: int, cache_mode: str):
+        if node.parent is None:
+            return None
+        return self._contract_parent_side(node, term, term_index, cache_mode)
+
+    def _contract_subtree(self, node, term, term_index: int, cache_mode: str):
         node_idx = self.ttns.node_idx[node]
         ket = node.tensor
         factors = self.sop._local_matrix_factors(node_idx, term.local_ops.get(node_idx))
@@ -321,7 +362,7 @@ class SOPOneSiteEffective:
         bra_indices = []
         ket_indices = []
         for child in node.children:
-            env = self._branch_env(child, term, use_cache=use_cache)
+            env = self._branch_env(child, term, term_index, cache_mode)
             child_idx = self.ttns.node_idx[child]
             bra_child = ("sop_bra_child", child_idx)
             ket_child = ("sop_ket_child", child_idx)
@@ -341,7 +382,55 @@ class SOPOneSiteEffective:
         args.extend([node.tensor.conj(), bra_indices, ket, ket_indices, [bra_parent, ket_parent]])
         return oe_contract(*args)
 
-    def _apply_term(self, term, use_env: bool):
+    def _contract_parent_side(self, node, term, term_index: int, cache_mode: str):
+        parent = node.parent
+        parent_idx = self.ttns.node_idx[parent]
+        node_idx = self.ttns.node_idx[node]
+        ket = parent.tensor
+        factors = self.sop._local_matrix_factors(parent_idx, term.local_ops.get(parent_idx))
+        physical_axis0 = len(parent.children)
+        for ibasis, mat in enumerate(factors):
+            if mat is not None:
+                ket = _apply_matrix_on_axis(ket, mat, physical_axis0 + ibasis)
+
+        args = []
+        bra_indices = []
+        ket_indices = []
+        active_bra = active_ket = None
+        for child in parent.children:
+            child_idx = self.ttns.node_idx[child]
+            bra_child = ("sop_parent_bra_child", child_idx)
+            ket_child = ("sop_parent_ket_child", child_idx)
+            if child is node:
+                active_bra = bra_child
+                active_ket = ket_child
+            else:
+                env = self._branch_env(child, term, term_index, cache_mode)
+                args.extend([env, [bra_child, ket_child]])
+            bra_indices.append(bra_child)
+            ket_indices.append(ket_child)
+
+        for iphys in range(len(parent.tensor.shape) - len(parent.children) - 1):
+            phys = ("sop_parent_phys", parent_idx, iphys)
+            bra_indices.append(phys)
+            ket_indices.append(phys)
+
+        if parent.parent is None:
+            parent_bond = ("sop_parent_root_bond", parent_idx)
+            bra_indices.append(parent_bond)
+            ket_indices.append(parent_bond)
+        else:
+            env = self._parent_env(parent, term, term_index, cache_mode)
+            bra_parent = ("sop_parent_bra_parent", parent_idx)
+            ket_parent = ("sop_parent_ket_parent", parent_idx)
+            args.extend([env, [bra_parent, ket_parent]])
+            bra_indices.append(bra_parent)
+            ket_indices.append(ket_parent)
+
+        args.extend([parent.tensor.conj(), bra_indices, ket, ket_indices, [active_bra, active_ket]])
+        return oe_contract(*args)
+
+    def _apply_term(self, term, term_index: int, cache_mode: str):
         tensor = self.active_node.tensor
         factors = self.sop._local_matrix_factors(self.active_idx, term.local_ops.get(self.active_idx))
         physical_axis0 = len(self.active_node.children)
@@ -354,7 +443,7 @@ class SOPOneSiteEffective:
         tensor_indices = []
         output_indices = []
         for child in self.active_node.children:
-            env = self._branch_env(child, term, use_cache=use_env)
+            env = self._branch_env(child, term, term_index, cache_mode)
             child_idx = self.ttns.node_idx[child]
             bra_child = ("sop_active_bra_child", child_idx)
             ket_child = ("sop_active_ket_child", child_idx)
@@ -367,9 +456,176 @@ class SOPOneSiteEffective:
             tensor_indices.append(phys)
             output_indices.append(phys)
 
-        parent = ("sop_active_parent", self.active_idx)
-        tensor_indices.append(parent)
-        output_indices.append(parent)
+        if self.active_node.parent is None:
+            parent = ("sop_active_parent", self.active_idx)
+            tensor_indices.append(parent)
+            output_indices.append(parent)
+        else:
+            env = self._parent_env(self.active_node, term, term_index, cache_mode)
+            bra_parent = ("sop_active_bra_parent", self.active_idx)
+            ket_parent = ("sop_active_ket_parent", self.active_idx)
+            args.extend([env, [bra_parent, ket_parent]])
+            tensor_indices.append(ket_parent)
+            output_indices.append(bra_parent)
+        args.insert(1, tensor_indices)
+        args.append(output_indices)
+        return oe_contract(*args)
+
+
+class SOPMCTDHSweepEnvironment:
+    """Strict SOP state-environment baseline over a whole one-site sweep.
+
+    The cache key is ``(source_node_idx, target_node_idx, term_index)``.  This
+    deliberately preserves the flat SOP term structure: identical operator
+    subtrees from different terms are not merged or hashed together.
+    """
+
+    def __init__(self, sop: SOPBaselineOperator, ttns: TTNS):
+        self.sop = sop
+        self.ttns = ttns
+        self._env_cache: Dict[Tuple[int, int, int], np.ndarray] = {}
+
+    def build_env_cache(self):
+        for term_index, term in enumerate(self.sop.terms):
+            for node in self.ttns.postorder_list():
+                if node.parent is not None:
+                    self._env_cache[self._edge_key(node, node.parent, term_index)] = (
+                        self._contract_node_to_parent(node, term, term_index)
+                    )
+            for parent in self.ttns.node_list:
+                for child in parent.children:
+                    self._env_cache[self._edge_key(parent, child, term_index)] = (
+                        self._contract_parent_to_child(parent, child, term, term_index)
+                    )
+
+    def apply(self, active_nodes):
+        return [self.apply_node(active_node) for active_node in active_nodes]
+
+    def apply_node(self, active_node):
+        active_idx = self.ttns.node_idx[active_node]
+        result = np.zeros_like(active_node.tensor)
+        for term_index, term in enumerate(self.sop.terms):
+            result = result + self._apply_term(active_node, active_idx, term, term_index)
+        return result
+
+    def _edge_key(self, source, target, term_index: int):
+        return self.ttns.node_idx[source], self.ttns.node_idx[target], term_index
+
+    def _edge_env(self, source, target, term_index: int):
+        return self._env_cache[self._edge_key(source, target, term_index)]
+
+    def _contract_node_to_parent(self, node, term, term_index: int):
+        node_idx = self.ttns.node_idx[node]
+        ket = node.tensor
+        factors = self.sop._local_matrix_factors(node_idx, term.local_ops.get(node_idx))
+        physical_axis0 = len(node.children)
+        for ibasis, mat in enumerate(factors):
+            if mat is not None:
+                ket = _apply_matrix_on_axis(ket, mat, physical_axis0 + ibasis)
+
+        args = []
+        bra_indices = []
+        ket_indices = []
+        for child in node.children:
+            child_idx = self.ttns.node_idx[child]
+            bra_child = ("sop_mctdh_up_bra_child", node_idx, child_idx)
+            ket_child = ("sop_mctdh_up_ket_child", node_idx, child_idx)
+            args.extend([self._edge_env(child, node, term_index), [bra_child, ket_child]])
+            bra_indices.append(bra_child)
+            ket_indices.append(ket_child)
+
+        for iphys in range(len(node.tensor.shape) - len(node.children) - 1):
+            phys = ("sop_mctdh_up_phys", node_idx, iphys)
+            bra_indices.append(phys)
+            ket_indices.append(phys)
+
+        bra_parent = ("sop_mctdh_up_bra_parent", node_idx)
+        ket_parent = ("sop_mctdh_up_ket_parent", node_idx)
+        bra_indices.append(bra_parent)
+        ket_indices.append(ket_parent)
+        args.extend([node.tensor.conj(), bra_indices, ket, ket_indices, [bra_parent, ket_parent]])
+        return oe_contract(*args)
+
+    def _contract_parent_to_child(self, parent, child, term, term_index: int):
+        parent_idx = self.ttns.node_idx[parent]
+        child_idx = self.ttns.node_idx[child]
+        ket = parent.tensor
+        factors = self.sop._local_matrix_factors(parent_idx, term.local_ops.get(parent_idx))
+        physical_axis0 = len(parent.children)
+        for ibasis, mat in enumerate(factors):
+            if mat is not None:
+                ket = _apply_matrix_on_axis(ket, mat, physical_axis0 + ibasis)
+
+        args = []
+        bra_indices = []
+        ket_indices = []
+        active_bra = active_ket = None
+        for sibling in parent.children:
+            sibling_idx = self.ttns.node_idx[sibling]
+            bra_child = ("sop_mctdh_down_bra_child", parent_idx, sibling_idx)
+            ket_child = ("sop_mctdh_down_ket_child", parent_idx, sibling_idx)
+            if sibling is child:
+                active_bra = bra_child
+                active_ket = ket_child
+            else:
+                args.extend([self._edge_env(sibling, parent, term_index), [bra_child, ket_child]])
+            bra_indices.append(bra_child)
+            ket_indices.append(ket_child)
+
+        for iphys in range(len(parent.tensor.shape) - len(parent.children) - 1):
+            phys = ("sop_mctdh_down_phys", parent_idx, iphys)
+            bra_indices.append(phys)
+            ket_indices.append(phys)
+
+        if parent.parent is None:
+            parent_bond = ("sop_mctdh_down_root_bond", parent_idx)
+            bra_indices.append(parent_bond)
+            ket_indices.append(parent_bond)
+        else:
+            bra_parent = ("sop_mctdh_down_bra_parent", parent_idx)
+            ket_parent = ("sop_mctdh_down_ket_parent", parent_idx)
+            args.extend([self._edge_env(parent.parent, parent, term_index), [bra_parent, ket_parent]])
+            bra_indices.append(bra_parent)
+            ket_indices.append(ket_parent)
+
+        args.extend([parent.tensor.conj(), bra_indices, ket, ket_indices, [active_bra, active_ket]])
+        return oe_contract(*args)
+
+    def _apply_term(self, active_node, active_idx: int, term, term_index: int):
+        tensor = active_node.tensor
+        factors = self.sop._local_matrix_factors(active_idx, term.local_ops.get(active_idx))
+        physical_axis0 = len(active_node.children)
+        for ibasis, mat in enumerate(factors):
+            if mat is not None:
+                tensor = _apply_matrix_on_axis(tensor, mat, physical_axis0 + ibasis)
+        tensor = tensor * term.coeff
+
+        args = [tensor]
+        tensor_indices = []
+        output_indices = []
+        for child in active_node.children:
+            child_idx = self.ttns.node_idx[child]
+            bra_child = ("sop_mctdh_active_bra_child", active_idx, child_idx)
+            ket_child = ("sop_mctdh_active_ket_child", active_idx, child_idx)
+            args.extend([self._edge_env(child, active_node, term_index), [bra_child, ket_child]])
+            tensor_indices.append(ket_child)
+            output_indices.append(bra_child)
+
+        for iphys in range(len(tensor.shape) - len(active_node.children) - 1):
+            phys = ("sop_mctdh_active_phys", active_idx, iphys)
+            tensor_indices.append(phys)
+            output_indices.append(phys)
+
+        if active_node.parent is None:
+            parent = ("sop_mctdh_active_parent", active_idx)
+            tensor_indices.append(parent)
+            output_indices.append(parent)
+        else:
+            bra_parent = ("sop_mctdh_active_bra_parent", active_idx)
+            ket_parent = ("sop_mctdh_active_ket_parent", active_idx)
+            args.extend([self._edge_env(active_node.parent, active_node, term_index), [bra_parent, ket_parent]])
+            tensor_indices.append(ket_parent)
+            output_indices.append(bra_parent)
         args.insert(1, tensor_indices)
         args.append(output_indices)
         return oe_contract(*args)
@@ -406,23 +662,94 @@ def _ttno_one_site_action(ttns, ttno, active_node, timeout_sec: int):
     return action, env_time, expr_time, apply_time, max(env_mem, expr_mem, apply_mem), apply_status
 
 
+def _ttno_active_scope_action(ttns, ttno, active_nodes, timeout_sec: int):
+    ttne, env_time, env_mem, env_status = _time_and_memory(lambda: TTNEnviron(ttns, ttno), timeout_sec)
+    if env_status != "ok":
+        return None, env_time, 0.0, 0.0, env_mem, env_status
+
+    exprs, expr_time, expr_mem, expr_status = _time_and_memory(
+        lambda: [hop_expr1(active_node, ttns, ttno, ttne) for active_node in active_nodes],
+        timeout_sec,
+    )
+    if expr_status != "ok":
+        return None, env_time, expr_time, 0.0, max(env_mem, expr_mem), expr_status
+
+    actions, apply_time, apply_mem, apply_status = _time_and_memory(
+        lambda: [expr(active_node.tensor) for expr, active_node in zip(exprs, active_nodes)],
+        timeout_sec,
+    )
+    return actions, env_time, expr_time, apply_time, max(env_mem, expr_mem, apply_mem), apply_status
+
+
 def _sop_one_site_action(sop, ttns, active_node, method: str, timeout_sec: int):
     applier = SOPOneSiteEffective(sop, ttns, active_node)
     env_time = 0.0
     env_mem = 0.0
-    if method == "sop_with_env":
+    cache_mode = SOP_METHOD_CACHE_MODE[method]
+    if cache_mode != SOP_CACHE_NONE:
+        _, env_time, env_mem, env_status = _time_and_memory(lambda: applier.build_env_cache(cache_mode), timeout_sec)
+        if env_status != "ok":
+            return None, env_time, 0.0, 0.0, env_mem, env_status, len(applier._env_cache)
+    action, apply_time, apply_mem, apply_status = _time_and_memory(
+        lambda: applier.apply(cache_mode=cache_mode), timeout_sec
+    )
+    return action, env_time, 0.0, apply_time, max(env_mem, apply_mem), apply_status, len(applier._env_cache)
+
+
+def _sop_active_scope_action(sop, ttns, active_nodes, method: str, timeout_sec: int):
+    if method == "sop_mctdh_like_state_env" and len(active_nodes) > 1:
+        applier = SOPMCTDHSweepEnvironment(sop, ttns)
         _, env_time, env_mem, env_status = _time_and_memory(applier.build_env_cache, timeout_sec)
         if env_status != "ok":
-            return None, env_time, 0.0, 0.0, env_mem, env_status
-    action, apply_time, apply_mem, apply_status = _time_and_memory(
-        lambda: applier.apply(use_env=(method == "sop_with_env")), timeout_sec
-    )
-    return action, env_time, 0.0, apply_time, max(env_mem, apply_mem), apply_status
+            return None, env_time, 0.0, 0.0, env_mem, env_status, len(applier._env_cache)
+        actions, apply_time, apply_mem, apply_status = _time_and_memory(
+            lambda: applier.apply(active_nodes), timeout_sec
+        )
+        return (
+            actions,
+            env_time,
+            0.0,
+            apply_time,
+            max(env_mem, apply_mem),
+            apply_status,
+            len(applier._env_cache),
+        )
+
+    actions = []
+    env_time = 0.0
+    expr_time = 0.0
+    apply_time = 0.0
+    memory_mb = 0.0
+    n_env_cache_entries = 0
+    for active_node in active_nodes:
+        action, node_env_t, node_expr_t, node_apply_t, node_mem, status, node_cache_entries = _sop_one_site_action(
+            sop, ttns, active_node, method, timeout_sec
+        )
+        env_time += node_env_t
+        expr_time += node_expr_t
+        apply_time += node_apply_t
+        memory_mb = max(memory_mb, node_mem)
+        n_env_cache_entries += node_cache_entries
+        if status != "ok":
+            return None, env_time, expr_time, apply_time, memory_mb, status, n_env_cache_entries
+        actions.append(action)
+    return actions, env_time, expr_time, apply_time, memory_mb, "ok", n_env_cache_entries
 
 
 def _relative_error(action, reference):
     if action is None or reference is None:
         return math.nan
+    if isinstance(action, list) or isinstance(reference, list):
+        if not isinstance(action, list) or not isinstance(reference, list) or len(action) != len(reference):
+            return math.nan
+        denom_sq = 0.0
+        diff_sq = 0.0
+        for item, ref_item in zip(action, reference):
+            item = np.asarray(item)
+            ref_item = np.asarray(ref_item)
+            denom_sq += float(np.linalg.norm(ref_item.ravel()) ** 2)
+            diff_sq += float(np.linalg.norm((item - ref_item).ravel()) ** 2)
+        return math.sqrt(diff_sq / denom_sq) if denom_sq != 0 else math.sqrt(diff_sq)
     action = np.asarray(action)
     reference = np.asarray(reference)
     denom = np.linalg.norm(reference.ravel())
@@ -457,9 +784,28 @@ def _local_dim_summary(tree):
     return json.dumps(counts, sort_keys=True)
 
 
-def _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_node, git_commit):
+def _tree_depth(node):
+    if not node.children:
+        return 1
+    return 1 + max(_tree_depth(child) for child in node.children)
+
+
+def _active_nodes(psi, active_scope: str):
+    if active_scope == "root":
+        return [psi.root]
+    if active_scope == "all_nodes":
+        return list(psi.node_list)
+    raise ValueError(f"Unsupported active scope {active_scope!r}")
+
+
+def _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, active_scope, git_commit):
     n_fermion_sites = 4 * n_lead + 2
     n_boson_sites = n_phonon
+    n_total_sites = n_fermion_sites + n_boson_sites
+    n_active_nodes = len(active_nodes)
+    tree_depth = _tree_depth(psi.root)
+    active_node_idx = tree.node_idx[tree.root] if active_scope == "root" else "all"
+    quantity = "local_effective_1site_apply" if active_scope == "root" else "local_effective_1site_apply_all_nodes"
     return {
         "case_name": "hubbard_junction",
         "scaling_path": path_name,
@@ -467,29 +813,37 @@ def _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_no
         "n_phonon": n_phonon,
         "n_fermion_sites": n_fermion_sites,
         "n_boson_sites": n_boson_sites,
-        "n_total_sites": n_fermion_sites + n_boson_sites,
+        "n_total_sites": n_total_sites,
         "n_sop_terms": sop.n_terms,
+        "n_active_nodes": n_active_nodes,
+        "tree_depth": tree_depth,
+        "n_sop_terms_times_n_total_sites": sop.n_terms * n_total_sites,
+        "n_sop_terms_times_n_active_nodes": sop.n_terms * n_active_nodes,
+        "n_sop_terms_times_tree_depth": sop.n_terms * tree_depth,
         "ttno_max_bond": max(ttno.bond_dims),
         "ttno_mean_bond": float(onp.mean(ttno.bond_dims)),
         "state_max_bond": max(psi.bond_dims),
         "local_basis_summary": _local_dim_summary(tree),
-        "active_node_idx": tree.node_idx[tree.root],
-        "quantity": "local_effective_1site_apply",
+        "active_node_idx": active_node_idx,
+        "quantity": quantity,
         "backend": "cpu",
         "num_threads": os.environ.get("RENO_NUM_THREADS", ""),
         "git_commit": git_commit,
     }
 
 
-def _method_row(metadata, method, repeat_id, env_t, expr_t, apply_t, mem_mb, rel_err, status):
+def _method_row(metadata, method, repeat_id, env_t, expr_t, term_loop_t, apply_t, mem_mb, rel_err, status,
+                n_env_cache_entries=0):
     return {
         **metadata,
         "method": method,
         "repeat_id": repeat_id,
         "time_env_build_sec": env_t,
         "time_expr_build_sec": expr_t,
+        "time_term_loop_sec": term_loop_t,
         "time_apply_sec": apply_t,
         "time_total_sec": env_t + expr_t + apply_t,
+        "n_env_cache_entries": n_env_cache_entries,
         "memory_peak_mb": mem_mb,
         "relative_error_vs_ttno": rel_err,
         "status": status,
@@ -501,40 +855,41 @@ def _run_point(path_name, n_lead, n_phonon, repeat_id, args, git_commit, skip_me
     tree, terms, psi = build_hubbard_junction_case(n_lead, n_phonon, max_phonon_basis=args.max_phonon_basis)
     sop = SOPBaselineOperator.from_symbolic_terms(terms, tree)
     ttno = TTNO(tree, terms)
-    active_node = psi.root
-    metadata = _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_node, git_commit)
+    active_nodes = _active_nodes(psi, args.active_scope)
+    metadata = _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, args.active_scope, git_commit)
 
     rows = []
     if "ttno_with_env" in skip_methods:
         ref = None
         rows.append(_method_row(
-            metadata, "ttno_with_env", repeat_id, 0.0, 0.0, 0.0, 0.0, math.nan,
+            metadata, "ttno_with_env", repeat_id, 0.0, 0.0, 0.0, 0.0, 0.0, math.nan,
             "skipped_after_previous_timeout_or_memory",
         ))
     else:
-        ref, env_t, expr_t, apply_t, mem_mb, status = _ttno_one_site_action(psi, ttno, active_node, args.timeout_sec)
+        ref, env_t, expr_t, apply_t, mem_mb, status = _ttno_active_scope_action(psi, ttno, active_nodes, args.timeout_sec)
         if status == "ok" and args.memory_limit_mb > 0 and mem_mb > args.memory_limit_mb:
             status = f"memory_limit_exceeded: {mem_mb:.1f} MB > {args.memory_limit_mb:.1f} MB"
         rows.append(_method_row(
-            metadata, "ttno_with_env", repeat_id, env_t, expr_t, apply_t, mem_mb,
+            metadata, "ttno_with_env", repeat_id, env_t, expr_t, 0.0, apply_t, mem_mb,
             0.0 if status == "ok" else math.nan, status,
         ))
 
-    for method in ("sop_no_env", "sop_with_env"):
+    for method in ("sop_no_env", "sop_mctdh_like_state_env", "sop_env_plus_operator_cache"):
         if method in skip_methods:
             rows.append(_method_row(
-                metadata, method, repeat_id, 0.0, 0.0, 0.0, 0.0, math.nan,
+                metadata, method, repeat_id, 0.0, 0.0, 0.0, 0.0, 0.0, math.nan,
                 "skipped_after_previous_timeout_or_memory",
             ))
             continue
-        action, env_t, expr_t, apply_t, mem_mb, status = _sop_one_site_action(
-            sop, psi, active_node, method, args.timeout_sec
+        action, env_t, expr_t, apply_t, mem_mb, status, n_env_cache_entries = _sop_active_scope_action(
+            sop, psi, active_nodes, method, args.timeout_sec
         )
         if status == "ok" and args.memory_limit_mb > 0 and mem_mb > args.memory_limit_mb:
             status = f"memory_limit_exceeded: {mem_mb:.1f} MB > {args.memory_limit_mb:.1f} MB"
         rows.append(_method_row(
-            metadata, method, repeat_id, env_t, expr_t, apply_t, mem_mb,
+            metadata, method, repeat_id, env_t, expr_t, apply_t, apply_t, mem_mb,
             _relative_error(action, ref) if status == "ok" else math.nan, status,
+            n_env_cache_entries=n_env_cache_entries,
         ))
     return rows
 
@@ -614,7 +969,15 @@ def _fit_one(rows, method, scaling_path, x_axis, fit_window, stability_tol):
 
 def compute_fits(rows, stability_tol: float):
     fits = []
-    x_axes = ["n_total_sites", "n_sop_terms", "n_lead", "n_phonon"]
+    x_axes = [
+        "n_total_sites",
+        "n_sop_terms",
+        "n_lead",
+        "n_phonon",
+        "n_sop_terms_times_n_total_sites",
+        "n_sop_terms_times_n_active_nodes",
+        "n_sop_terms_times_tree_depth",
+    ]
     paths = sorted({r["scaling_path"] for r in rows})
     for path in paths:
         for method in METHODS:
@@ -802,6 +1165,7 @@ def parse_args():
     parser.add_argument("--stop-after-consecutive-failures", type=int, default=2)
     parser.add_argument("--alpha-stability-tol", type=float, default=0.25)
     parser.add_argument("--max-phonon-basis", type=int, default=4)
+    parser.add_argument("--active-scope", choices=["root", "all_nodes"], default="root")
     parser.add_argument("--output", type=Path, default=RESULT_DIR / "adaptive_operator_env_raw.csv")
     parser.add_argument("--fit-output", type=Path, default=RESULT_DIR / "adaptive_operator_env_fits.csv")
     return parser.parse_args()

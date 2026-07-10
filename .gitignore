@@ -32,3 +32,4 @@ dist/
 .coverage*
 
 *.csv
+temp

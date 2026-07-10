@@ -30,7 +30,14 @@ commit `5fbf5a1 Update SOP operator` 新增或修改：
 
 下一阶段要补足：
 
-- 明确 benchmark method 字段：`sop_no_env`, `sop_with_env`, `ttno_with_env`。
+- 明确 benchmark method 字段：`sop_no_env`, `sop_mctdh_like_state_env`, `sop_env_plus_operator_cache`, `ttno_with_env`。
 - 为 SOP 增加 local effective Hamiltonian / active node 级别的 environment 复用。
 - benchmark 分离 environment build time 和 local apply time。
-- 用数值一致性证明三条路径对应同一个 Hamiltonian action。
+- 用数值一致性证明四条路径对应同一个 Hamiltonian action。
+
+当前工作区已新增 strict MCTDH-like all-nodes benchmark path：
+
+- `benchmarks/benchmark_adaptive_operator_env.py::SOPMCTDHSweepEnvironment`
+- `active_scope=all_nodes`
+- cache key: `(source_node_idx, target_node_idx, term_index)`
+- 不跨 SOP terms 共享 operator structure。

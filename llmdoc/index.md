@@ -33,5 +33,6 @@
 
 - `llmdoc/memory/decisions/2026-07-08-curie-reno39-testing.md`：固定使用 Curie `reno-3.9` 环境测试的决策记录。
 - `llmdoc/memory/reflections/`：后续阶段性反思记录。
+  - `llmdoc/memory/reflections/2026-07-10-strict-mctdh-sop-baseline.md`：strict MCTDH-like SOP baseline、root/all-nodes timing object 区分、旧实现误判原因。
 
 `.llmdoc-tmp/` 是临时调查区，不属于稳定文档。

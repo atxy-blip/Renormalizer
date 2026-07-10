@@ -91,7 +91,11 @@ for snode, new_snode, onode in zip(ttns, new, ttno):
 
 full-state `method="sop_with_env"` 当前仍未实现，并应明确抛出 `NotImplementedError`。
 
-benchmark 里的 `sop_with_env` 是一个 one-site local effective Hamiltonian action 最小实现，位置：
+benchmark 里有三类 SOP local effective Hamiltonian paths。
+
+### One-site branch cache
+
+`SOPOneSiteEffective` 是 one-site local effective Hamiltonian action 的基础实现，位置：
 
 ```text
 benchmarks/benchmark_adaptive_operator_env.py::SOPOneSiteEffective
@@ -104,7 +108,71 @@ benchmarks/benchmark_adaptive_operator_env.py::SOPOneSiteEffective
 - branch subtree 上非 identity local `Op` 的 signature；
 - 相同 branch signature 的 SOP terms 共享同一个 precontracted branch environment。
 
-这能测试导师关心的 contraction-environment 效应，但它不是完整 TDVP sweep 或 full-state `H|psi>` implementation。
+这种 path 对应 `sop_env_plus_operator_cache`。它包含 operator-structure reuse，不能作为 strict Heidelberg/MCTDH-like SOP baseline。
+
+`SOPOneSiteEffective` 也支持 term-index cache：
+
+```text
+(branch_root_idx, term_index)
+```
+
+这个模式不跨 SOP terms 共享 operator signature，但如果对每个 active node 单独构造，仍然会重复 building state environment，不是 sweep-level MCTDH-like reuse。
+
+### Strict MCTDH-like sweep environment
+
+strict MCTDH-like baseline 位置：
+
+```text
+benchmarks/benchmark_adaptive_operator_env.py::SOPMCTDHSweepEnvironment
+```
+
+它对每个 SOP term 和每条 tree edge 构造两个方向的 state environment message：
+
+```text
+child -> parent
+parent -> child
+```
+
+cache key 是：
+
+```text
+(source_node_idx, target_node_idx, term_index)
+```
+
+这表示：
+
+- 保留 flat SOP term list；
+- 不使用 TTNO/MPO operator bonds；
+- 不跨 product terms 合并相同 operator subtree；
+- 只复用 state-tree / mean-field-like contraction boundary。
+
+all-nodes sweep 下，cache entry 数应为：
+
+```text
+n_sop_terms * 2 * (n_nodes - 1)
+```
+
+这对应 `sop_mctdh_like_state_env`。复杂度预期是：
+
+```text
+env build + all-node local action ~ n_sop_terms * n_nodes ~ N^2
+```
+
+### Timing object matters
+
+`active_scope=root` 只测 root one-site action。此时 naive no-env 是：
+
+```text
+n_sop_terms * n_tree ~ N^2
+```
+
+`active_scope=all_nodes` 测所有 active nodes 的 one-site action。此时 naive no-env 是：
+
+```text
+n_active_nodes * n_sop_terms * n_tree ~ N^3
+```
+
+因此不能用 root-only benchmark 解释 Heidelberg MCTDH propagation / full sweep scaling。
 
 ## 可复用但不能直接照搬的部分
 
@@ -117,4 +185,4 @@ benchmarks/benchmark_adaptive_operator_env.py::SOPOneSiteEffective
 不能直接照搬：
 
 - `TTNEnviron` 当前假设 operator 是一个 TTNO tensor network，environment tensor 有 operator bond 维度。
-- flat SOP 没有 TTNO bond。SOP-with-env 需要按 product term 的 branch operator signature 缓存，而不是按 TTNO bond contraction。
+- flat SOP 没有 TTNO bond。strict MCTDH-like SOP-with-env 需要按 product term 和 directed tree edge 缓存 state environment；优化版 SOP 才可以额外按 branch operator signature 合并。
