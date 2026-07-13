@@ -1,5 +1,11 @@
 # 2026-07-09 Operator Environment Large Benchmark
 
+> 2026-07-10 状态：本文件记录的是历史 root-only benchmark，不再作为
+> strict `N^3/N^2/N` 主图数据源。相关文件已归档到
+> `benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/`。
+> 当前最终 all-nodes 数据源是 job 114336，见
+> `benchmarks/results/operator_env_scaling/README.md`。
+
 ## 背景
 
 目标不是简单证明 TTNO 比 SOP 快，而是区分三条递进路径：
@@ -31,21 +37,23 @@ status: COMPLETED
 输入和输出：
 
 ```text
-raw_csv: benchmarks/results/adaptive_operator_env/large_114126_raw.csv
-raw_fit_csv: benchmarks/results/adaptive_operator_env/large_114126_fits.csv
-formal_summary: benchmarks/results/adaptive_operator_env/large_114126_formal_summary.csv
-formal_mean_fit: benchmarks/results/adaptive_operator_env/large_114126_formal_mean_fits.csv
-formal_figures_prefix: benchmarks/results/adaptive_operator_env/large_114126_formal_*.png/pdf
+raw_csv: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_raw.csv
+raw_fit_csv: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_fits.csv
+formal_summary: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_formal_summary.csv
+formal_mean_fit: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_formal_mean_fits.csv
+formal_figures_prefix: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_formal_*.png/pdf
 ```
 
-正式图用 plot 环境生成：
+以下是 2026-07-09 当时使用的生成命令记录。当前 plotter 已收窄为 strict
+all-nodes 三方法正式图，不再用于重新生成这组 root-only 历史图；原图已完整
+保存在归档目录。
 
 ```bash
 env MPLCONFIGDIR=/tmp/matplotlib-operator-env \
 conda run -p /software/cache/yuxiong/plot \
 python benchmarks/plot_operator_env_scaling.py \
-  --raw benchmarks/results/adaptive_operator_env/large_114126_raw.csv \
-  --output-prefix benchmarks/results/adaptive_operator_env/large_114126_formal
+  --raw benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_raw.csv \
+  --output-prefix benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/large_114126_formal
 ```
 
 ## scaling path 定义
@@ -139,3 +147,11 @@ ttno_with_env:
 ```
 
 注意：当前 `sop_with_env` benchmark 是 one-site local effective Hamiltonian action，不是完整 full-state `H|psi>` 或完整 TDVP sweep。
+
+## 与最终 strict 图的关系
+
+本 run 的 `sop_with_env` 使用 operator-signature cache，后来重命名为
+`sop_env_plus_operator_cache`。它不是 strict MCTDH-like baseline。最终图不
+显示该中间路径，只显示 all-nodes `sop_no_env`、
+`sop_mctdh_like_state_env` 和 `ttno_with_env`，并提供理论斜率
+`alpha=3,2,1` 作为虚线参考。

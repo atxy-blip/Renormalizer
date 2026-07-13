@@ -15,8 +15,8 @@ set -uo pipefail
 # Slurm array benchmark for SOP vs TTNO operator representation scaling.
 # Each task runs one benchmark point and writes one CSV into
 # benchmarks/results/slurm_points/.  Merge them afterwards with:
-#   conda run -n reno-3.9 python benchmarks/merge_sop_vs_ttno_results.py
-#   conda run -n reno-3.9 python benchmarks/create_sop_vs_ttno_notebook.py
+#   conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/merge_sop_vs_ttno_results.py
+#   conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/create_sop_vs_ttno_notebook.py
 
 module load cuda/12.4 || true
 source /software/devtools/anaconda3/etc/profile.d/conda.sh
@@ -64,13 +64,13 @@ if (( TASK_ID < N_LEAD )); then
     CASE="lead"
     NLEAD=${LEAD_POINTS[$TASK_ID]}
     OUT="benchmarks/results/slurm_points/lead_nlead${NLEAD}_phonon${PHONON_FIXED}.csv"
-    CMD=(python -u benchmarks/benchmark_sop_vs_ttno.py --case lead --lead-list "$NLEAD" --phonon "$PHONON_FIXED" --repeats "$REPEATS" --output "$OUT")
+    CMD=(python -u benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case lead --lead-list "$NLEAD" --phonon "$PHONON_FIXED" --repeats "$REPEATS" --output "$OUT")
 elif (( TASK_ID < N_LEAD + N_PHONON )); then
     IDX=$(( TASK_ID - N_LEAD ))
     CASE="phonon"
     NPH=${PHONON_POINTS[$IDX]}
     OUT="benchmarks/results/slurm_points/phonon_lead${LEAD_FIXED}_nphonon${NPH}.csv"
-    CMD=(python -u benchmarks/benchmark_sop_vs_ttno.py --case phonon --lead "$LEAD_FIXED" --phonon-list "$NPH" --repeats "$REPEATS" --output "$OUT")
+    CMD=(python -u benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case phonon --lead "$LEAD_FIXED" --phonon-list "$NPH" --repeats "$REPEATS" --output "$OUT")
 else
     IDX=$(( TASK_ID - N_LEAD - N_PHONON ))
     RANK_IDX=$(( IDX / ${#SHARED_SIZES[@]} ))
@@ -79,7 +79,7 @@ else
     RANK=${SHARED_RANKS[$RANK_IDX]}
     SIZE=${SHARED_SIZES[$SIZE_IDX]}
     OUT="benchmarks/results/slurm_points/shared_size${SIZE}_rank${RANK}.csv"
-    CMD=(python -u benchmarks/benchmark_sop_vs_ttno.py --case shared-structure --size-list "$SIZE" --rank-list "$RANK" --repeats "$REPEATS" --output "$OUT")
+    CMD=(python -u benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case shared-structure --size-list "$SIZE" --rank-list "$RANK" --repeats "$REPEATS" --output "$OUT")
 fi
 
 echo "=================================================="

@@ -55,8 +55,34 @@
 
 ## Benchmark / tests
 
-- `benchmarks/benchmark_sop_vs_ttno.py`
-  - 当前 full-state flat SOP vs TTNO apply benchmark。
+- `benchmarks/benchmark_adaptive_operator_env.py`
+  - `SOPOneSiteEffective`：one-site branch environment，可选 operator signature cache。
+  - `SOPMCTDHSweepEnvironment`：strict per-term directed-edge state environment。
+  - `_run_point()`：运行选定方法并拆分 env/apply/total timing。
+
+- `benchmarks/ren_formal_manifest.py`
+  - 定义 Ren-style Tree benchmark 的 `N_site/M_s/d` 参数和 216 个 array tasks。
+
+- `benchmarks/run_ren_formal_point.py`
+  - 运行一个 manifest task，原子保存 JSON-backed compressed NPZ。
+
+- `benchmarks/scripts/curie_cpu_ren_formal_array.sbatch`
+  - Curie CPU 正式三变量 array job wrapper。
+
+- `benchmarks/plot_operator_env_scaling.py`
+  - 聚合 raw rows，绘制三方法三 panel PDF；固定参考线不进入 legend。
+
+- `renormalizer/tn/tests/test_adaptive_operator_env_benchmark.py`
+  - strict message cache、方法选择和 benchmark 字段测试。
+
+- `renormalizer/tn/tests/test_operator_env_scaling_plot.py`
+  - 三 panel 聚合、reference curve 和 PDF plotter 测试。
+
+- `renormalizer/tn/tests/test_ren_formal_benchmark.py`
+  - formal manifest、snapshot 原子落盘和 task runner 测试。
+
+- `benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py`
+  - 历史 full-state flat SOP vs TTNO apply benchmark。
 
 - `renormalizer/tn/tests/test_sop_baseline.py`
   - SOP 与 TTNO dense/apply/expectation 一致性测试。

@@ -32,7 +32,11 @@
 ## 记忆区
 
 - `llmdoc/memory/decisions/2026-07-08-curie-reno39-testing.md`：固定使用 Curie `reno-3.9` 环境测试的决策记录。
+- `llmdoc/memory/decisions/2026-07-09-operator-env-large-benchmark.md`：历史 root-only large benchmark 及其降级为归档数据源的原因。
+- `llmdoc/memory/lessons-learned.md`：从已归档 reflection 提炼的 benchmark identity 与长作业规则。
+- `llmdoc/memory/doc-gaps.md`：`M_s^3`、TTNO `d^4`、full-step timing 和 formal 缺失任务的闭合条件。
 - `llmdoc/memory/reflections/`：后续阶段性反思记录。
-  - `llmdoc/memory/reflections/2026-07-10-strict-mctdh-sop-baseline.md`：strict MCTDH-like SOP baseline、root/all-nodes timing object 区分、旧实现误判原因。
+  - `llmdoc/memory/reflections/2026-07-13-ren-formal-tree-scaling-gaps.md`：formal 三变量 partial 结果、与 Ren.J.2022 的对象差异和待诊断问题。
+- `llmdoc/memory/archive/2026-07-13/`：已被 lessons 和稳定文档总结的 2026-07-10 原始 reflection。
 
 `.llmdoc-tmp/` 是临时调查区，不属于稳定文档。

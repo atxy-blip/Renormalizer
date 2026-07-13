@@ -226,10 +226,10 @@ For the same symbolic Hamiltonian and TTNS state representation, the compressed 
         _markdown_cell("""## 8. Reproducibility
 
 ```bash
-python benchmarks/benchmark_sop_vs_ttno.py --case lead --lead-list 1 2 4 8 16 32 --phonon 2 --repeats 7 --output benchmarks/results/lead_scaling.csv
-python benchmarks/benchmark_sop_vs_ttno.py --case phonon --lead 4 --phonon-list 1 2 4 8 16 32 --repeats 7 --output benchmarks/results/phonon_scaling.csv
-python benchmarks/benchmark_sop_vs_ttno.py --case shared-structure --size-list 4 8 16 32 64 --rank-list 1 2 4 --repeats 7 --output benchmarks/results/shared_structure_scaling.csv
-python benchmarks/create_sop_vs_ttno_notebook.py
+python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case lead --lead-list 1 2 4 8 16 32 --phonon 2 --repeats 7 --output benchmarks/results/lead_scaling.csv
+python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case phonon --lead 4 --phonon-list 1 2 4 8 16 32 --repeats 7 --output benchmarks/results/phonon_scaling.csv
+python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case shared-structure --size-list 4 8 16 32 64 --rank-list 1 2 4 --repeats 7 --output benchmarks/results/shared_structure_scaling.csv
+python benchmarks/archive/legacy_sop_vs_ttno/create_sop_vs_ttno_notebook.py
 ```
 """),
     ]

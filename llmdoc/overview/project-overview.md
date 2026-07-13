@@ -14,7 +14,7 @@ commit `5fbf5a1 Update SOP operator` 新增或修改：
 - `renormalizer/tn/__init__.py`
   - 导出 `SOPBaselineOperator` 和 `SOPTerm`。
 
-- `benchmarks/benchmark_sop_vs_ttno.py`
+- `benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py`
   - 构造 Hubbard junction / shared-structure benchmark。
   - 比较 flat SOP apply 和 TTNO apply。
 
@@ -41,3 +41,15 @@ commit `5fbf5a1 Update SOP operator` 新增或修改：
 - `active_scope=all_nodes`
 - cache key: `(source_node_idx, target_node_idx, term_index)`
 - 不跨 SOP terms 共享 operator structure。
+
+当前还新增 Ren-style formal Tree benchmark infrastructure：
+
+- `benchmarks/ren_formal_manifest.py`：定义 `N_site/M_s/d` 三个 panel 的 216 个任务。
+- `benchmarks/run_ren_formal_point.py`：每个方法、点、repeat 独立运行并原子写 NPZ。
+- `benchmarks/scripts/curie_cpu_ren_formal_array.sbatch`：Curie CPU array wrapper。
+- `benchmarks/plot_operator_env_scaling.py`：只输出三方法、三 panel PDF。
+
+当前 formal 数据为 204/216 个快照。N panel 支持 strict all-node 的
+`N^3/N^2/N`；大 `M_s` 区间三种方法均约 `M_s^3`，大 `d` 区间 SOP 近常数而
+TTNO 约 `d^4`。后两项与 Ren.J.2022 中不同程序/算法对象的 `M_s^4` 和 `d^2`
+不能直接等同，已作为待诊断问题保留。

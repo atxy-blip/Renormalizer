@@ -7,7 +7,7 @@
 #SBATCH --partition=CPU
 #SBATCH --mem=128GB
 #SBATCH --qos=normal
-#SBATCH --output=benchmarks/results/slurm_logs/adaptive_operator_env_%j.log
+#SBATCH --output=benchmarks/results/operator_env_scaling/runs/adaptive_operator_env_%j.log
 
 set -euo pipefail
 
@@ -33,14 +33,21 @@ REPO_DIR=${REPO_DIR:-/curie-home/yuxiong/Reno-quantity}
 RUN_PROFILE=${RUN_PROFILE:-sanity}
 SCALING_PATH=${SCALING_PATH:-all}
 ACTIVE_SCOPE=${ACTIVE_SCOPE:-root}
+STATE_BOND_BASE_LEAD=${STATE_BOND_BASE_LEAD:-8}
+STATE_BOND_BASE_PHONON=${STATE_BOND_BASE_PHONON:-0}
+PRIMITIVE_BASIS_BASE_LEAD=${PRIMITIVE_BASIS_BASE_LEAD:-4}
+PRIMITIVE_BASIS_BASE_PHONON=${PRIMITIVE_BASIS_BASE_PHONON:-4}
+PRIMITIVE_BASIS_STATE_BOND=${PRIMITIVE_BASIS_STATE_BOND:-1}
 cd "$REPO_DIR"
 
-mkdir -p benchmarks/results/slurm_logs benchmarks/results/adaptive_operator_env
+mkdir -p benchmarks/results/operator_env_scaling/runs
 
 case "$RUN_PROFILE" in
     sanity)
         LEAD_VALUES=${LEAD_VALUES:-"4 8"}
         BALANCED_PAIRS=${BALANCED_PAIRS:-"4:1 8:2"}
+        STATE_BOND_VALUES=${STATE_BOND_VALUES:-"1 2"}
+        PRIMITIVE_BASIS_VALUES=${PRIMITIVE_BASIS_VALUES:-"2 4"}
         REPEATS=${REPEATS:-1}
         TIMEOUT_SEC=${TIMEOUT_SEC:-600}
         MEMORY_LIMIT_MB=${MEMORY_LIMIT_MB:-0}
@@ -49,6 +56,8 @@ case "$RUN_PROFILE" in
     medium)
         LEAD_VALUES=${LEAD_VALUES:-"4 8 16 32"}
         BALANCED_PAIRS=${BALANCED_PAIRS:-"4:1 8:2 16:4 32:8"}
+        STATE_BOND_VALUES=${STATE_BOND_VALUES:-"1 2 4 8"}
+        PRIMITIVE_BASIS_VALUES=${PRIMITIVE_BASIS_VALUES:-"2 4 8"}
         REPEATS=${REPEATS:-3}
         TIMEOUT_SEC=${TIMEOUT_SEC:-1800}
         MEMORY_LIMIT_MB=${MEMORY_LIMIT_MB:-110000}
@@ -57,6 +66,8 @@ case "$RUN_PROFILE" in
     large)
         LEAD_VALUES=${LEAD_VALUES:-"4 8 16 32 64 128"}
         BALANCED_PAIRS=${BALANCED_PAIRS:-"4:1 8:2 16:4 32:8 64:16"}
+        STATE_BOND_VALUES=${STATE_BOND_VALUES:-"1 2 4 8 16"}
+        PRIMITIVE_BASIS_VALUES=${PRIMITIVE_BASIS_VALUES:-"2 4 8 16"}
         REPEATS=${REPEATS:-3}
         TIMEOUT_SEC=${TIMEOUT_SEC:-3600}
         MEMORY_LIMIT_MB=${MEMORY_LIMIT_MB:-110000}
@@ -68,7 +79,7 @@ case "$RUN_PROFILE" in
         ;;
 esac
 
-OUT_PREFIX="benchmarks/results/adaptive_operator_env/${RUN_PROFILE}_${SLURM_JOB_ID:-local}"
+OUT_PREFIX="benchmarks/results/operator_env_scaling/runs/${RUN_PROFILE}_${SLURM_JOB_ID:-local}"
 RAW_OUT="${OUT_PREFIX}_raw.csv"
 FIT_OUT="${OUT_PREFIX}_fits.csv"
 
@@ -81,6 +92,13 @@ echo "Python: $(which python)"
 python --version
 echo "LEAD_VALUES=$LEAD_VALUES"
 echo "BALANCED_PAIRS=$BALANCED_PAIRS"
+echo "STATE_BOND_VALUES=$STATE_BOND_VALUES"
+echo "PRIMITIVE_BASIS_VALUES=$PRIMITIVE_BASIS_VALUES"
+echo "STATE_BOND_BASE_LEAD=$STATE_BOND_BASE_LEAD"
+echo "STATE_BOND_BASE_PHONON=$STATE_BOND_BASE_PHONON"
+echo "PRIMITIVE_BASIS_BASE_LEAD=$PRIMITIVE_BASIS_BASE_LEAD"
+echo "PRIMITIVE_BASIS_BASE_PHONON=$PRIMITIVE_BASIS_BASE_PHONON"
+echo "PRIMITIVE_BASIS_STATE_BOND=$PRIMITIVE_BASIS_STATE_BOND"
 echo "SCALING_PATH=$SCALING_PATH"
 echo "REPEATS=$REPEATS"
 echo "TIMEOUT_SEC=$TIMEOUT_SEC"
@@ -99,6 +117,13 @@ python -u benchmarks/benchmark_adaptive_operator_env.py \
     --scaling-path "$SCALING_PATH" \
     --lead-values "$LEAD_VALUES" \
     --balanced-pairs "$BALANCED_PAIRS" \
+    --state-bond-values "$STATE_BOND_VALUES" \
+    --primitive-basis-values "$PRIMITIVE_BASIS_VALUES" \
+    --state-bond-base-lead "$STATE_BOND_BASE_LEAD" \
+    --state-bond-base-phonon "$STATE_BOND_BASE_PHONON" \
+    --primitive-basis-base-lead "$PRIMITIVE_BASIS_BASE_LEAD" \
+    --primitive-basis-base-phonon "$PRIMITIVE_BASIS_BASE_PHONON" \
+    --primitive-basis-state-bond "$PRIMITIVE_BASIS_STATE_BOND" \
     --repeats "$REPEATS" \
     --timeout-sec "$TIMEOUT_SEC" \
     --memory-limit-mb "$MEMORY_LIMIT_MB" \

@@ -57,3 +57,32 @@ all_nodes, fit vs n_lead, large-only:
 ```
 
 `sop_env_plus_operator_cache` 目前是 per-active-node branch signature cache path，不是完整 sweep-level operator-cache baseline。
+
+## 2026-07-13 formal three-variable benchmark
+
+正式数组固定比较 `sop_no_env`、`sop_mctdh_like_state_env` 和
+`ttno_with_env`，每个点 3 repeats。当前为 204/216 个 `status=ok` 快照，缺少
+`N=300` 的 no-env 和 `M_s=300` 的全部方法，仍属于 partial result。
+
+现有数据支持：
+
+```text
+N_total_sites:
+  sop_no_env                  alpha ~= 3.26  (up to N=186)
+  sop_mctdh_like_state_env    alpha ~= 2.16  (up to N=300)
+  ttno_with_env               alpha ~= 1.05  (up to N=300)
+
+large M_s window:
+  all three methods           alpha ~= 3
+
+large d window:
+  SOP methods                 approximately constant
+  ttno_with_env               alpha ~= 4
+```
+
+`M_s^3` 和 TTNO `d^4` 是当前 Tree kernel 的观测，不是从 Ren.J.2022 继承的
+理论结论。论文测试 Heidelberg ML-MCTDH / MPS TD-DMRG 的完整 evolution step；
+当前 quantity 是 Hubbard-junction random TTNS 上的
+`local_effective_1site_apply_all_nodes`。为什么 strict Tree SOP 没有显示 binary
+ML-MCTDH 的 `M_s^4`，以及为什么 Tree TTNO 没有显示论文 TD-DMRG 的 `d^2`，仍需
+用实际 tensor shape、QN block、opt_einsum FLOP/path 和 full-step timing 诊断。

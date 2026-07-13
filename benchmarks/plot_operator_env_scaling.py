@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Plot mean-per-size scaling figures for the adaptive operator benchmark."""
+"""Plot the strict all-node SOP/TTNO scaling comparison."""
 
 import argparse
 import csv
 import json
 import math
 import statistics
+from dataclasses import dataclass
 from collections import defaultdict
 from pathlib import Path
 
@@ -16,30 +17,78 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-METHODS = (
+PUBLICATION_METHODS = (
     "sop_no_env",
     "sop_mctdh_like_state_env",
-    "sop_env_plus_operator_cache",
     "ttno_with_env",
 )
+REFERENCE_ALPHA = {
+    "sop_no_env": 3.0,
+    "sop_mctdh_like_state_env": 2.0,
+    "ttno_with_env": 1.0,
+}
 METHOD_LABELS = {
     "sop_no_env": "SOP no env",
     "sop_mctdh_like_state_env": "SOP strict state env",
-    "sop_env_plus_operator_cache": "SOP env + op cache",
-    "sop_with_env": "SOP with env",
     "ttno_with_env": "TTNO with env",
 }
 METHOD_COLORS = {
     "sop_no_env": "#a23b3b",
-    "sop_mctdh_like_state_env": "#8c6d31",
-    "sop_env_plus_operator_cache": "#2f6f9f",
-    "sop_with_env": "#2f6f9f",
+    "sop_mctdh_like_state_env": "#a06a16",
     "ttno_with_env": "#2f7d46",
 }
-PATH_LABELS = {
-    "lead_only": "Lead-only scaling",
-    "balanced_lead_phonon": "Balanced lead-phonon scaling",
+LEGEND_KWARGS = {
+    "loc": "upper left",
+    "fontsize": 8,
+    "frameon": True,
+    "framealpha": 0.9,
 }
+
+
+@dataclass(frozen=True)
+class ScalingPanel:
+    name: str
+    x_axis: str
+    xlabel: str
+    symbol: str
+    title: str
+    preferred_paths: tuple
+    reference_alpha_by_method: tuple
+
+
+SCALING_PANELS = (
+    ScalingPanel(
+        name="site_number",
+        x_axis="n_total_sites",
+        xlabel=r"Number of sites, $N_{\mathrm{site}}$",
+        symbol="N",
+        title=r"Site number $N$",
+        preferred_paths=("site_number", "lead_only", "balanced_lead_phonon"),
+        reference_alpha_by_method=tuple(REFERENCE_ALPHA.items()),
+    ),
+    ScalingPanel(
+        name="state_bond",
+        x_axis="state_max_bond",
+        xlabel=r"State bond dimension, $M_s$",
+        symbol="M_s",
+        title=r"State bond $M_s$",
+        preferred_paths=("state_bond", "bond_dimension", "ms_scaling"),
+        reference_alpha_by_method=tuple((method, 3.0) for method in PUBLICATION_METHODS),
+    ),
+    ScalingPanel(
+        name="primitive_basis",
+        x_axis="primitive_basis_dim",
+        xlabel=r"Primitive basis dimension, $d$",
+        symbol="d",
+        title=r"Primitive basis $d$",
+        preferred_paths=("primitive_basis", "primitive_basis_dim", "d_scaling"),
+        reference_alpha_by_method=(
+            ("sop_no_env", 0.0),
+            ("sop_mctdh_like_state_env", 0.0),
+            ("ttno_with_env", 4.0),
+        ),
+    ),
+)
 
 
 SUMMARY_FIELDS = [
@@ -55,6 +104,8 @@ SUMMARY_FIELDS = [
     "n_sop_terms_times_tree_depth",
     "ttno_max_bond",
     "ttno_mean_bond",
+    "state_max_bond",
+    "primitive_basis_dim",
     "method",
     "n_repeats",
     "time_total_mean_sec",
@@ -92,19 +143,40 @@ def stdev(values):
     return statistics.stdev(values) if len(values) > 1 else 0.0
 
 
+def primitive_basis_dim(row):
+    try:
+        basis_summary = json.loads(row.get("local_basis_summary", "{}"))
+    except json.JSONDecodeError:
+        return math.nan
+    dims = []
+    for key in basis_summary:
+        try:
+            dims.append(float(key.rsplit(":", 1)[1]))
+        except (IndexError, ValueError):
+            continue
+    return max(dims) if dims else math.nan
+
+
 def summarize(rows):
     groups = defaultdict(list)
     meta = {}
     for row in rows:
-        if row["status"] != "ok":
+        if row["status"] != "ok" or row["method"] not in PUBLICATION_METHODS:
             continue
-        key = (row["scaling_path"], int(row["n_lead"]), int(row["n_phonon"]), row["method"])
+        key = (
+            row["scaling_path"],
+            int(row["n_lead"]),
+            int(row["n_phonon"]),
+            int(float(row.get("state_max_bond", 0))),
+            primitive_basis_dim(row),
+            row["method"],
+        )
         groups[key].append(row)
         meta[key] = row
 
     summary = []
     for key in sorted(groups):
-        path, n_lead, n_phonon, method = key
+        path, n_lead, n_phonon, _state_max_bond, _primitive_basis_dim, method = key
         group = groups[key]
         m = meta[key]
         times = [float(r["time_total_sec"]) for r in group]
@@ -137,6 +209,8 @@ def summarize(rows):
             ))),
             "ttno_max_bond": int(float(m["ttno_max_bond"])),
             "ttno_mean_bond": float(m["ttno_mean_bond"]),
+            "state_max_bond": int(float(m.get("state_max_bond", 0))),
+            "primitive_basis_dim": primitive_basis_dim(m),
             "method": method,
             "n_repeats": len(group),
             "time_total_mean_sec": mean(times),
@@ -163,48 +237,32 @@ def linfit(points, x_axis):
 
 def compute_fits(summary):
     fits = []
-    x_axes = (
-        "n_total_sites",
-        "n_sop_terms",
-        "n_lead",
-        "n_phonon",
-        "n_sop_terms_times_n_total_sites",
-        "n_sop_terms_times_n_active_nodes",
-        "n_sop_terms_times_tree_depth",
-    )
     paths = sorted({r["scaling_path"] for r in summary})
     for path in paths:
-        for method in METHODS:
-            points = [
-                r for r in summary
-                if r["scaling_path"] == path and r["method"] == method and r["time_total_mean_sec"] > 0
-            ]
-            points.sort(key=lambda r: (float(r["n_total_sites"]), float(r["n_sop_terms"])))
-            for x_axis in x_axes:
-                if x_axis == "n_phonon" and path == "lead_only":
-                    continue
-                valid = [p for p in points if float(p[x_axis]) > 0]
-                for fit_window in ("all_mean", "large_mean"):
-                    if fit_window == "large_mean" and len(valid) >= 4:
-                        used = valid[len(valid) // 2:]
-                    else:
-                        used = valid
-                    excluded = [f"{p['n_lead']}:{p['n_phonon']}" for p in valid if p not in used]
-                    if len(used) < 2:
-                        alpha = intercept = r2 = math.nan
-                    else:
-                        alpha, intercept, r2 = linfit(used, x_axis)
-                    fits.append({
-                        "scaling_path": path,
-                        "method": method,
-                        "x_axis": x_axis,
-                        "fit_window": fit_window,
-                        "alpha": alpha,
-                        "intercept_logC": intercept,
-                        "r2": r2,
-                        "n_points_used": len(used),
-                        "points_excluded": json.dumps(excluded),
-                    })
+        for method in PUBLICATION_METHODS:
+            for panel in SCALING_PANELS:
+                points = [
+                    r for r in summary
+                    if r["scaling_path"] == path and r["method"] == method and r["time_total_mean_sec"] > 0
+                ]
+                points.sort(key=lambda r: (float(r[panel.x_axis]), float(r["n_total_sites"])))
+                valid = [p for p in points if float(p[panel.x_axis]) > 0]
+                distinct_x = {float(p[panel.x_axis]) for p in valid}
+                if len(valid) < 2 or len(distinct_x) < 2:
+                    alpha = intercept = r2 = math.nan
+                else:
+                    alpha, intercept, r2 = linfit(valid, panel.x_axis)
+                fits.append({
+                    "scaling_path": path,
+                    "method": method,
+                    "x_axis": panel.x_axis,
+                    "fit_window": "all_mean",
+                    "alpha": alpha,
+                    "intercept_logC": intercept,
+                    "r2": r2,
+                    "n_points_used": len(valid),
+                    "points_excluded": json.dumps([]),
+                })
     return fits
 
 
@@ -216,7 +274,7 @@ def write_csv(path, rows, fields):
         writer.writerows(rows)
 
 
-def fit_lookup(fits, path, method, x_axis, window="large_mean"):
+def fit_lookup(fits, path, method, x_axis="n_total_sites", window="all_mean"):
     for fit in fits:
         if (
             fit["scaling_path"] == path
@@ -234,93 +292,134 @@ def path_method_points(summary, path, method):
     return pts
 
 
-def plot_time(summary, fits, output_prefix, x_axis):
+def panel_path(summary, panel):
     paths = sorted({row["scaling_path"] for row in summary})
-    fig, axes = plt.subplots(1, len(paths), figsize=(5.75 * len(paths), 4.2), sharey=False)
-    axes = np.atleast_1d(axes)
-    for ax, path in zip(axes, paths):
-        for method in METHODS:
-            pts = path_method_points(summary, path, method)
-            if not pts:
+    for preferred in panel.preferred_paths:
+        if preferred in paths and _path_has_varying_axis(summary, preferred, panel.x_axis):
+            return preferred
+    for path in paths:
+        if _path_has_varying_axis(summary, path, panel.x_axis):
+            return path
+    return None
+
+
+def _path_has_varying_axis(summary, path, x_axis):
+    values = {
+        float(row[x_axis])
+        for row in summary
+        if row["scaling_path"] == path
+        and row["method"] in PUBLICATION_METHODS
+        and float(row.get("time_total_mean_sec", 0.0)) > 0
+        and float(row.get(x_axis, 0.0)) > 0
+    }
+    return len(values) >= 2
+
+
+def reference_curve(x, y, alpha):
+    """Return a reference power law centered on a measured data series."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    x_anchor = float(np.exp(np.mean(np.log(x))))
+    y_anchor = float(np.exp(np.mean(np.log(y))))
+    return x, y_anchor * (x / x_anchor) ** alpha
+
+
+def reference_curve_last_half(x, y, alpha):
+    """Return a power-law guide over the latter half, ending at the last point."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    x_ref = x[len(x) // 2 :]
+    return x_ref, y[-1] * (x_ref / x[-1]) ** alpha
+
+
+def method_legend_label(method):
+    return METHOD_LABELS[method]
+
+
+def reference_annotation(symbol, alpha):
+    if alpha == 0:
+        return r"$\propto \mathrm{const}$"
+    return rf"$\propto {symbol}^{int(alpha)}$"
+
+
+def validate_publication_input(rows):
+    quantities = {row["quantity"] for row in rows if row["status"] == "ok"}
+    expected_quantity = {"local_effective_1site_apply_all_nodes"}
+    if quantities != expected_quantity:
+        raise ValueError(
+            "publication plot requires all-node local actions; "
+            f"found quantities {sorted(quantities)}"
+        )
+    methods = {row["method"] for row in rows if row["status"] == "ok"}
+    missing = set(PUBLICATION_METHODS) - methods
+    if missing:
+        raise ValueError(f"publication plot is missing methods: {sorted(missing)}")
+
+
+def plot_publication_time(summary, fits, output_prefix):
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.1), sharey=True)
+    legend_handles = []
+    legend_labels = []
+    for ax, panel in zip(axes, SCALING_PANELS):
+        path = panel_path(summary, panel)
+        reference_alpha = dict(panel.reference_alpha_by_method)
+        if path is None:
+            ax.text(0.5, 0.5, "not measured", transform=ax.transAxes, ha="center", va="center")
+            ax.set_title(panel.title)
+            ax.set_xlabel(panel.xlabel)
+            ax.grid(True, which="both", linewidth=0.6, alpha=0.25)
+            continue
+
+        all_x = []
+        for method in PUBLICATION_METHODS:
+            pts = [
+                r for r in path_method_points(summary, path, method)
+                if float(r[panel.x_axis]) > 0 and float(r["time_total_mean_sec"]) > 0
+            ]
+            pts.sort(key=lambda r: float(r[panel.x_axis]))
+            if len(pts) < 2:
                 continue
-            x = [float(p[x_axis]) for p in pts]
-            y = [float(p["time_total_mean_sec"]) for p in pts]
-            yerr = [float(p["time_total_std_sec"]) for p in pts]
-            alpha = fit_lookup(fits, path, method, x_axis)["alpha"]
-            ax.errorbar(
-                x,
-                y,
-                yerr=yerr,
-                marker="o",
-                linewidth=1.8,
-                capsize=3,
-                color=METHOD_COLORS[method],
-                label=f"{METHOD_LABELS[method]} (alpha={alpha:.2f})",
-            )
+            x = np.asarray([float(p[panel.x_axis]) for p in pts])
+            y = np.asarray([float(p["time_total_mean_sec"]) for p in pts])
+            color = METHOD_COLORS[method]
+            label = method_legend_label(method)
+            scatter = ax.scatter(x, y, s=42, color=color, zorder=3, label=label)
+            if panel is SCALING_PANELS[0]:
+                legend_handles.append(scatter)
+                legend_labels.append(label)
+
+            if method in reference_alpha:
+                if panel is SCALING_PANELS[0]:
+                    x_ref, y_ref = reference_curve(x, y, reference_alpha[method])
+                else:
+                    x_ref, y_ref = reference_curve_last_half(x, y, reference_alpha[method])
+                ax.plot(x_ref, y_ref, linestyle="--", linewidth=1.5, color=color, alpha=0.75)
+                ax.text(
+                    x_ref[-1],
+                    y_ref[-1],
+                    reference_annotation(panel.symbol, reference_alpha[method]),
+                    color=color,
+                    fontsize=8,
+                    ha="left",
+                    va="center",
+                )
+            all_x.extend(x)
+
         ax.set_xscale("log", base=2)
         ax.set_yscale("log")
-        ax.set_title(PATH_LABELS.get(path, path))
-        ax.set_xlabel(x_axis)
-        ax.grid(True, which="both", alpha=0.25)
-        ax.legend(fontsize=8)
-    axes[0].set_ylabel("Mean wall time (s)")
+        if all_x:
+            ax.set_xticks(sorted(set(all_x)))
+            ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.set_xlabel(panel.xlabel)
+        ax.set_title(panel.title)
+        ax.grid(True, which="both", linewidth=0.6, alpha=0.25)
+
+    axes[0].set_ylabel("Total wall time (s)")
+    if legend_handles:
+        axes[0].legend(legend_handles, legend_labels, **LEGEND_KWARGS)
+    fig.suptitle("Strict all-node operator scaling", y=1.08)
     fig.tight_layout()
-    fig.savefig(output_prefix.with_name(f"{output_prefix.name}_time_vs_{x_axis}.png"), dpi=240)
-    fig.savefig(output_prefix.with_name(f"{output_prefix.name}_time_vs_{x_axis}.pdf"))
-    plt.close(fig)
-
-
-def plot_diagnostics(summary, output_prefix):
-    paths = sorted({row["scaling_path"] for row in summary})
-    fig, axes = plt.subplots(len(paths), 3, figsize=(13.5, 3.6 * len(paths)))
-    axes = np.atleast_2d(axes)
-    for row_idx, path in enumerate(paths):
-        ttno_pts = path_method_points(summary, path, "ttno_with_env")
-        x = [float(p["n_total_sites"]) for p in ttno_pts]
-        axes[row_idx, 0].plot(x, [float(p["n_sop_terms"]) for p in ttno_pts], marker="o", color="#555555")
-        axes[row_idx, 0].set_ylabel(f"{PATH_LABELS.get(path, path)}\nSOP terms")
-        axes[row_idx, 1].plot(x, [float(p["ttno_max_bond"]) for p in ttno_pts], marker="o", color="#555555")
-        axes[row_idx, 1].set_ylabel("TTNO max bond")
-
-        means = {method: path_method_points(summary, path, method) for method in METHODS}
-        by_size = defaultdict(dict)
-        for method, pts in means.items():
-            for p in pts:
-                by_size[(p["n_lead"], p["n_phonon"])][method] = p
-        speed_x = []
-        speed_no_to_state = []
-        speed_state_to_cache = []
-        speed_cache_to_ttno = []
-        speed_no_to_ttno = []
-        for key in sorted(by_size, key=lambda k: float(by_size[k]["ttno_with_env"]["n_total_sites"])):
-            item = by_size[key]
-            required = {"sop_no_env", "sop_mctdh_like_state_env", "sop_env_plus_operator_cache", "ttno_with_env"}
-            if not required.issubset(item):
-                continue
-            speed_x.append(float(item["ttno_with_env"]["n_total_sites"]))
-            no_env = float(item["sop_no_env"]["time_total_mean_sec"])
-            state_env = float(item["sop_mctdh_like_state_env"]["time_total_mean_sec"])
-            op_cache = float(item["sop_env_plus_operator_cache"]["time_total_mean_sec"])
-            ttno = float(item["ttno_with_env"]["time_total_mean_sec"])
-            speed_no_to_state.append(no_env / state_env)
-            speed_state_to_cache.append(state_env / op_cache)
-            speed_cache_to_ttno.append(op_cache / ttno)
-            speed_no_to_ttno.append(no_env / ttno)
-        axes[row_idx, 2].plot(speed_x, speed_no_to_state, marker="o", label="no env / state env", color=METHOD_COLORS["sop_no_env"])
-        axes[row_idx, 2].plot(speed_x, speed_state_to_cache, marker="s", label="state env / op cache", color=METHOD_COLORS["sop_mctdh_like_state_env"])
-        axes[row_idx, 2].plot(speed_x, speed_cache_to_ttno, marker="^", label="op cache / TTNO", color=METHOD_COLORS["sop_env_plus_operator_cache"])
-        axes[row_idx, 2].plot(speed_x, speed_no_to_ttno, marker="d", label="no env / TTNO", color=METHOD_COLORS["ttno_with_env"])
-        axes[row_idx, 2].set_ylabel("Speedup")
-        axes[row_idx, 2].set_yscale("log")
-        axes[row_idx, 2].legend(fontsize=8)
-
-        for col in range(3):
-            axes[row_idx, col].set_xscale("log", base=2)
-            axes[row_idx, col].set_xlabel("n_total_sites")
-            axes[row_idx, col].grid(True, which="both", alpha=0.25)
-    fig.tight_layout()
-    fig.savefig(output_prefix.with_name(f"{output_prefix.name}_diagnostics.png"), dpi=240)
-    fig.savefig(output_prefix.with_name(f"{output_prefix.name}_diagnostics.pdf"))
+    fig.savefig(output_prefix.with_name(f"{output_prefix.name}_scaling_three_panel.pdf"), bbox_inches="tight")
     plt.close(fig)
 
 
@@ -331,16 +430,16 @@ def main():
     args = parser.parse_args()
 
     rows = read_raw(args.raw)
+    validate_publication_input(rows)
     summary = summarize(rows)
     fits = compute_fits(summary)
     write_csv(args.output_prefix.with_name(f"{args.output_prefix.name}_summary.csv"), summary, SUMMARY_FIELDS)
-    write_csv(args.output_prefix.with_name(f"{args.output_prefix.name}_mean_fits.csv"), fits, FIT_FIELDS)
-    plot_time(summary, fits, args.output_prefix, "n_total_sites")
-    plot_time(summary, fits, args.output_prefix, "n_sop_terms")
-    plot_diagnostics(summary, args.output_prefix)
+    write_csv(args.output_prefix.with_name(f"{args.output_prefix.name}_fits.csv"), fits, FIT_FIELDS)
+    plot_publication_time(summary, fits, args.output_prefix)
 
     print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_summary.csv')}")
-    print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_mean_fits.csv')}")
+    print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_fits.csv')}")
+    print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_scaling_three_panel.pdf')}")
 
 
 if __name__ == "__main__":

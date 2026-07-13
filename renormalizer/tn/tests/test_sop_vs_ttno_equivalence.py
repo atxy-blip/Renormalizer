@@ -1,4 +1,6 @@
-from benchmarks.benchmark_sop_vs_ttno import build_hubbard_junction_case
+from benchmarks.archive.legacy_sop_vs_ttno.benchmark_sop_vs_ttno import (
+    build_hubbard_junction_case,
+)
 from renormalizer.mps.backend import np
 from renormalizer.tn import SOPBaselineOperator, TTNO
 

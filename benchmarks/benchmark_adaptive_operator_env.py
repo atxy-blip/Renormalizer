@@ -158,6 +158,7 @@ def build_hubbard_junction_case(
     use_e_ph: bool = True,
     initial_occupied: bool = False,
     max_phonon_basis: int = 4,
+    force_phonon_basis: int = None,
 ):
     """Build the Hubbard junction tree, including the n_phonon=0 lead-only case."""
 
@@ -258,8 +259,11 @@ def build_hubbard_junction_case(
         ham_terms.extend(sys_op * ph_op)
 
     if n_phonon > 0:
-        nbas = np.max([16 * c2 / w**3, np.ones(n_phonon) * 4], axis=0)
-        nbas = np.minimum(np.round(nbas).astype(int), max_phonon_basis)
+        if force_phonon_basis is None:
+            nbas = np.max([16 * c2 / w**3, np.ones(n_phonon) * 4], axis=0)
+            nbas = np.minimum(np.round(nbas).astype(int), max_phonon_basis)
+        else:
+            nbas = np.ones(n_phonon, dtype=int) * int(force_phonon_basis)
         basis_list_phonon = [
             BasisSHO(f"v_{imode}", w[imode], int(nbas[imode])) for imode in range(n_phonon)
         ]
@@ -851,30 +855,58 @@ def _method_row(metadata, method, repeat_id, env_t, expr_t, term_loop_t, apply_t
     }
 
 
-def _run_point(path_name, n_lead, n_phonon, repeat_id, args, git_commit, skip_methods=frozenset()):
-    tree, terms, psi = build_hubbard_junction_case(n_lead, n_phonon, max_phonon_basis=args.max_phonon_basis)
+def _run_point(
+    path_name,
+    n_lead,
+    n_phonon,
+    repeat_id,
+    args,
+    git_commit,
+    skip_methods=frozenset(),
+    state_bond_dim: int = 1,
+    primitive_basis_dim: int = None,
+    selected_methods=METHODS,
+):
+    tree, terms, psi = build_hubbard_junction_case(
+        n_lead,
+        n_phonon,
+        max_phonon_basis=args.max_phonon_basis,
+        force_phonon_basis=primitive_basis_dim,
+    )
+    if state_bond_dim > 1:
+        psi = TTNS.random(tree, qntot=0, m_max=state_bond_dim)
     sop = SOPBaselineOperator.from_symbolic_terms(terms, tree)
     ttno = TTNO(tree, terms)
     active_nodes = _active_nodes(psi, args.active_scope)
     metadata = _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, args.active_scope, git_commit)
 
     rows = []
-    if "ttno_with_env" in skip_methods:
+    selected_methods = tuple(selected_methods)
+    needs_ttno_reference = "ttno_with_env" in selected_methods or any(
+        method.startswith("sop_") for method in selected_methods
+    )
+    if not needs_ttno_reference:
         ref = None
-        rows.append(_method_row(
-            metadata, "ttno_with_env", repeat_id, 0.0, 0.0, 0.0, 0.0, 0.0, math.nan,
-            "skipped_after_previous_timeout_or_memory",
-        ))
+    elif "ttno_with_env" in skip_methods:
+        ref = None
+        if "ttno_with_env" in selected_methods:
+            rows.append(_method_row(
+                metadata, "ttno_with_env", repeat_id, 0.0, 0.0, 0.0, 0.0, 0.0, math.nan,
+                "skipped_after_previous_timeout_or_memory",
+            ))
     else:
         ref, env_t, expr_t, apply_t, mem_mb, status = _ttno_active_scope_action(psi, ttno, active_nodes, args.timeout_sec)
         if status == "ok" and args.memory_limit_mb > 0 and mem_mb > args.memory_limit_mb:
             status = f"memory_limit_exceeded: {mem_mb:.1f} MB > {args.memory_limit_mb:.1f} MB"
-        rows.append(_method_row(
-            metadata, "ttno_with_env", repeat_id, env_t, expr_t, 0.0, apply_t, mem_mb,
-            0.0 if status == "ok" else math.nan, status,
-        ))
+        if "ttno_with_env" in selected_methods:
+            rows.append(_method_row(
+                metadata, "ttno_with_env", repeat_id, env_t, expr_t, 0.0, apply_t, mem_mb,
+                0.0 if status == "ok" else math.nan, status,
+            ))
 
     for method in ("sop_no_env", "sop_mctdh_like_state_env", "sop_env_plus_operator_cache"):
+        if method not in selected_methods:
+            continue
         if method in skip_methods:
             rows.append(_method_row(
                 metadata, method, repeat_id, 0.0, 0.0, 0.0, 0.0, 0.0, math.nan,
@@ -906,13 +938,41 @@ def _parse_pairs(text: str) -> List[Tuple[int, int]]:
     return pairs
 
 
+def _make_point(n_lead: int, n_phonon: int, state_bond_dim: int = 1, primitive_basis_dim: int = None):
+    return (n_lead, n_phonon, state_bond_dim, primitive_basis_dim)
+
+
+def _unpack_point(point):
+    if len(point) == 2:
+        n_lead, n_phonon = point
+        return n_lead, n_phonon, 1, None
+    return point
+
+
 def _scaling_points(args):
     paths = []
-    if args.scaling_path in ("lead_only", "all"):
+    if args.scaling_path in ("lead_only", "all", "ren_variables"):
         leads = _parse_int_list(args.lead_values)
-        paths.append(("lead_only", [(n, 0) for n in leads]))
+        paths.append(("lead_only", [_make_point(n, 0) for n in leads]))
     if args.scaling_path in ("balanced_lead_phonon", "all"):
         paths.append(("balanced_lead_phonon", _parse_pairs(args.balanced_pairs)))
+    if args.scaling_path in ("state_bond", "ren_variables", "ren_aux"):
+        paths.append((
+            "state_bond",
+            [
+                _make_point(args.state_bond_base_lead, args.state_bond_base_phonon, m, None)
+                for m in _parse_int_list(args.state_bond_values)
+            ],
+        ))
+    if args.scaling_path in ("primitive_basis", "ren_variables", "ren_aux"):
+        state_bond_dim = getattr(args, "primitive_basis_state_bond", 1)
+        paths.append((
+            "primitive_basis",
+            [
+                _make_point(args.primitive_basis_base_lead, args.primitive_basis_base_phonon, state_bond_dim, d)
+                for d in _parse_int_list(args.primitive_basis_values)
+            ],
+        ))
     return paths
 
 
@@ -931,7 +991,8 @@ def _fit_one(rows, method, scaling_path, x_axis, fit_window, stability_tol):
     else:
         used = candidates
     excluded = [f"{r['n_lead']}:{r['n_phonon']}" for r in candidates if r not in used]
-    if len(used) < 2:
+    distinct_x = {float(r[x_axis]) for r in used}
+    if len(used) < 2 or len(distinct_x) < 2:
         return {
             "method": method,
             "scaling_path": scaling_path,
@@ -1017,6 +1078,12 @@ def write_csv(path, rows, fields):
         writer.writerows(rows)
 
 
+def write_csv_atomic(path, rows, fields):
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    write_csv(temporary, rows, fields)
+    temporary.replace(path)
+
+
 def save_plots(rows, output_prefix: Path):
     ok = _ok_rows(rows)
     if not ok:
@@ -1094,15 +1161,23 @@ def run_benchmark(args):
         consecutive_hard_failures = 0
         idx = 0
         while idx < len(points):
-            n_lead, n_phonon = points[idx]
+            n_lead, n_phonon, state_bond_dim, primitive_basis_dim = _unpack_point(points[idx])
             point_rows = []
             for repeat_id in range(args.repeats):
                 try:
-                    point_rows.extend(
-                        _run_point(path_name, n_lead, n_phonon, repeat_id, args, git_commit, disabled_methods)
+                    repeat_rows = _run_point(
+                        path_name,
+                        n_lead,
+                        n_phonon,
+                        repeat_id,
+                        args,
+                        git_commit,
+                        disabled_methods,
+                        state_bond_dim=state_bond_dim,
+                        primitive_basis_dim=primitive_basis_dim,
                     )
                 except Exception as exc:
-                    point_rows.append({
+                    repeat_rows = [{
                         **{field: math.nan for field in RAW_FIELDS},
                         "case_name": "hubbard_junction",
                         "scaling_path": path_name,
@@ -1114,16 +1189,22 @@ def run_benchmark(args):
                         "backend": "cpu",
                         "num_threads": os.environ.get("RENO_NUM_THREADS", ""),
                         "git_commit": git_commit,
-                    })
+                    }]
+                point_rows.extend(repeat_rows)
+                rows.extend(repeat_rows)
+                write_csv_atomic(args.output, rows, RAW_FIELDS)
             for row in point_rows:
                 if row.get("method") in METHODS and _is_resource_failure(row.get("status")):
                     disabled_methods.add(row["method"])
-            rows.extend(point_rows)
             ok_methods = {r["method"] for r in point_rows if str(r["status"]).startswith("ok")}
             if not ok_methods:
                 consecutive_hard_failures += 1
             else:
                 consecutive_hard_failures = 0
+            mark_overhead_rows(rows)
+            fits = compute_fits(rows, args.alpha_stability_tol)
+            write_csv_atomic(args.output, rows, RAW_FIELDS)
+            write_csv_atomic(args.fit_output, fits, FIT_FIELDS)
             if consecutive_hard_failures >= args.stop_after_consecutive_failures:
                 break
 
@@ -1138,26 +1219,46 @@ def run_benchmark(args):
                     and f["stable_vs_large"] == "True"
                 ]
                 if len(relevant) < len(METHODS):
-                    last_lead, last_phonon = points[-1]
+                    last_lead, last_phonon, last_state_bond, last_primitive_basis = _unpack_point(points[-1])
                     if path_name == "lead_only":
-                        points.append((last_lead * 2, 0))
-                    else:
+                        points.append(_make_point(last_lead * 2, 0))
+                    elif path_name == "balanced_lead_phonon":
                         points.append((last_lead * 2, max(last_phonon * 2, 1)))
+                    elif path_name == "state_bond":
+                        points.append(_make_point(last_lead, last_phonon, last_state_bond * 2, None))
+                    elif path_name == "primitive_basis":
+                        points.append(_make_point(
+                            last_lead,
+                            last_phonon,
+                            last_state_bond,
+                            last_primitive_basis * 2,
+                        ))
                     extra_used += 1
 
     mark_overhead_rows(rows)
     fits = compute_fits(rows, args.alpha_stability_tol)
-    write_csv(args.output, rows, RAW_FIELDS)
-    write_csv(args.fit_output, fits, FIT_FIELDS)
+    write_csv_atomic(args.output, rows, RAW_FIELDS)
+    write_csv_atomic(args.fit_output, fits, FIT_FIELDS)
     save_plots(rows, args.output.with_suffix(""))
     return rows, fits
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scaling-path", choices=["lead_only", "balanced_lead_phonon", "all"], default="all")
+    parser.add_argument(
+        "--scaling-path",
+        choices=["lead_only", "balanced_lead_phonon", "state_bond", "primitive_basis", "ren_aux", "ren_variables", "all"],
+        default="all",
+    )
     parser.add_argument("--lead-values", default="4 8 16 32 64 128")
     parser.add_argument("--balanced-pairs", default="4:1 8:2 16:4 32:8 64:16")
+    parser.add_argument("--state-bond-values", default="1 2 4 8 16")
+    parser.add_argument("--primitive-basis-values", default="2 4 8 16")
+    parser.add_argument("--state-bond-base-lead", type=int, default=8)
+    parser.add_argument("--state-bond-base-phonon", type=int, default=0)
+    parser.add_argument("--primitive-basis-base-lead", type=int, default=4)
+    parser.add_argument("--primitive-basis-base-phonon", type=int, default=4)
+    parser.add_argument("--primitive-basis-state-bond", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--timeout-sec", type=int, default=1800)
     parser.add_argument("--memory-limit-mb", type=float, default=0.0)

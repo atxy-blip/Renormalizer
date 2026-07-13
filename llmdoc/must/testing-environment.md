@@ -29,7 +29,7 @@ conda run -n reno-3.9 python -m pytest renormalizer/tn/tests/test_sop_baseline_d
 benchmark 小规模试跑：
 
 ```bash
-conda run -n reno-3.9 python benchmarks/benchmark_sop_vs_ttno.py --case lead --lead-list 1 2 --phonon 1 --repeats 2 --output benchmarks/results/dev_sop_vs_ttno.csv
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case lead --lead-list 1 2 --phonon 1 --repeats 2 --output benchmarks/results/dev_sop_vs_ttno.csv
 ```
 
 ## 注意事项
@@ -110,8 +110,8 @@ exit_code: 0:0
 backend: RENO_GPU='cpu'; Use NumPy as backend
 raw_rows: 12
 max_relative_error_vs_ttno: about 8e-16
-raw_csv: benchmarks/results/adaptive_operator_env/sanity_114123_raw.csv
-fit_csv: benchmarks/results/adaptive_operator_env/sanity_114123_fits.csv
+raw_csv: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/sanity_114123_raw.csv
+fit_csv: benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/sanity_114123_fits.csv
 ```
 
 strict MCTDH-like all-nodes sanity 记录：
@@ -128,6 +128,112 @@ result:
   sop_no_env                  large-only alpha vs n_lead ~= 3.02
   sop_mctdh_like_state_env    large-only alpha vs n_lead ~= 2.03
   ttno_with_env               large-only alpha vs n_lead ~= 1.01
-raw_csv: benchmarks/results/adaptive_operator_env/sanity_114334_raw.csv
-fit_csv: benchmarks/results/adaptive_operator_env/sanity_114334_fits.csv
+raw_csv: benchmarks/results/operator_env_scaling/archive/strict_all_nodes_development/sanity_114334_raw.csv
+fit_csv: benchmarks/results/operator_env_scaling/archive/strict_all_nodes_development/sanity_114334_fits.csv
+```
+
+最终 strict all-nodes 记录：
+
+```text
+job_id: 114336
+node: curie-cpu011
+status: COMPLETED
+exit_code: 0:0
+active_scope: all_nodes
+scaling_path: lead_only
+n_total_sites: 18 34 66
+fit_vs_n_total_sites:
+  sop_no_env                  alpha = 3.246
+  sop_mctdh_like_state_env    alpha = 2.167
+  ttno_with_env               alpha = 1.063
+result_dir: benchmarks/results/operator_env_scaling/final/
+```
+
+当前 large 三变量补充任务：
+
+```text
+job_id: 114439
+submitted: 2026-07-10
+active_scope: all_nodes
+scaling_path: lead_only
+purpose: 扩大 N_site 点数，补足 medium 只有 3 点的问题
+expected_outputs:
+  benchmarks/results/operator_env_scaling/runs/large_114439_raw.csv
+  benchmarks/results/operator_env_scaling/runs/large_114439_fits.csv
+  benchmarks/results/operator_env_scaling/runs/adaptive_operator_env_114439.log
+
+job_id: 114440
+submitted: 2026-07-10
+active_scope: all_nodes
+scaling_path: ren_aux
+purpose: 补充 Ren.J.2022 风格三变量图中的 M_s 和 d scaling
+expected_outputs:
+  benchmarks/results/operator_env_scaling/runs/large_114440_raw.csv
+  benchmarks/results/operator_env_scaling/runs/large_114440_fits.csv
+  benchmarks/results/operator_env_scaling/runs/adaptive_operator_env_114440.log
+```
+
+`ren_aux` 只包含 `state_bond` 和 `primitive_basis` path；后续需要与
+`lead_only` raw 合并后，再用 `benchmarks/plot_operator_env_scaling.py`
+生成完整三 panel PDF。
+
+2026-07-12 提交的 recoverable 分片任务：
+
+```text
+114776: lead_only, n_lead = 4 8 16
+114777: lead_only, n_lead = 32
+114778: state_bond, M_s = 4 8 16 32 64, fixed n_lead = 4
+114779: primitive_basis, d = 4 8 16 32, fixed n_lead = 1,
+        n_phonon = 16, state M_s = 16
+```
+
+这些任务使用 repeat-level raw CSV checkpoint。正式分析仍需等待作业结束后检查
+status、repeat 完整性和 relative error；checkpoint 中单一 x 值产生的临时 fit
+及 `RankWarning` 不用于 scaling 结论。
+
+2026-07-13 Ren-style formal Tree benchmark：
+
+```text
+job_id: 115005
+array_tasks: 216
+snapshot_root: benchmarks/results/operator_env_scaling/ren_formal/snapshots/
+manifest: benchmarks/results/operator_env_scaling/ren_formal/manifest.tsv
+```
+
+每个 `(panel, method, point, repeat)` 独立运行并原子写 JSON-backed NPZ。
+job 114789 因 runner 使用文件路径启动导致 `benchmarks` package import 失败，已
+取消；115005 改用 `python -m benchmarks.run_ren_formal_point` 后已验证生成
+`status=ok` 快照。
+
+截至 2026-07-13 的落盘状态：
+
+```text
+available_snapshots: 204 / 216
+available_status: all ok
+missing:
+  modes / sop_no_env / N_total_sites=300: 3 repeats
+  state_bond / all methods / M_s=300: 9 repeats
+frozen_partial_raw:
+  benchmarks/results/operator_env_scaling/ren_formal/partial_20260713_raw.csv
+partial_pdf:
+  benchmarks/results/operator_env_scaling/final/ren_formal_partial_20260713_scaling_three_panel.pdf
+```
+
+formal 参数由 manifest 固定：
+
+```text
+N panel:   M_s=20, d=10, N_total_sites=18 30 46 74 118 186 300
+M_s panel: N_phonon=16, d=10, M_s=10 20 30 50 70 100 150 220 300
+d panel:   N_phonon=16, M_s=20, d=5 10 20 30 40 50 70 100
+```
+
+当前 partial fit 的重点是 N panel 约为 `N^3/N^2/N`；大 `M_s` 区间三条方法
+均约 `M_s^3`；大 `d` 区间 SOP 近常数、TTNO 约 `d^4`。后两项必须保留为
+与 Ren.J.2022 不同 timing object/algorithm 的待解释问题，不能仅凭参考虚线定论。
+
+旧路径 `benchmarks/results/adaptive_operator_env/` 已整理为语义归档。正式图
+只生成 PDF，并排除 `sop_env_plus_operator_cache`。当前 formal partial 输出：
+
+```text
+benchmarks/results/operator_env_scaling/final/ren_formal_partial_20260713_scaling_three_panel.pdf
 ```

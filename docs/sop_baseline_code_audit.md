@@ -3,7 +3,7 @@
 ## Scope
 
 This audit covers `SOPBaselineOperator`, `SOPTerm`,
-`benchmarks/benchmark_sop_vs_ttno.py`, the junction source pattern in
+`benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py`, the junction source pattern in
 `../ttns-test/junction_zt_hubbard.py`, and the current TTNS/TTNO interfaces.
 
 ## Findings

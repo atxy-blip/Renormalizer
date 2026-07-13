@@ -133,7 +133,7 @@ relative_error =
 benchmarks/benchmark_adaptive_operator_env.py
 ```
 
-保留已有 `benchmarks/benchmark_sop_vs_ttno.py`，因为它仍可展示 full-state flat SOP vs TTNO apply。
+旧 full-state flat SOP vs TTNO apply 已归档到 `benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py`。
 
 新脚本字段建议：
 
@@ -178,7 +178,7 @@ ttno_with_env
 benchmarks/benchmark_adaptive_operator_env.py::build_hubbard_junction_case
 ```
 
-两条 scaling path：
+基础 scaling path：
 
 - `lead_only`
   - 扫描 `n_lead = 4, 8, 16, 32, 64, 128`；
@@ -188,6 +188,29 @@ benchmarks/benchmark_adaptive_operator_env.py::build_hubbard_junction_case
   - 扫描 `(n_lead, n_phonon) = (4,1), (8,2), (16,4), (32,8), (64,16)`；
   - lead 和 phonon 同时增加；
   - 目的：展示更接近 molecular junction 整体变大的 scaling。
+
+Ren.J.2022 风格三变量图使用三类 path：
+
+- `lead_only`：扫描 site number `N_site`。
+- `state_bond`：固定 Hamiltonian size，扫描 TTNS random state 的 state bond dimension `M_s`。
+- `primitive_basis`：固定 lead/phonon 数，强制 phonon primitive basis dimension `d`。
+
+组合 path：
+
+- `ren_aux`：只跑 `state_bond` 和 `primitive_basis`，适合和已有 `lead_only`
+  结果合并成三 panel 图。
+- `ren_variables`：一次跑 `lead_only`、`state_bond` 和 `primitive_basis`。
+
+历史 adaptive large 默认：
+
+```text
+STATE_BOND_VALUES = 1 2 4 8 16
+PRIMITIVE_BASIS_VALUES = 2 4 8 16
+STATE_BOND_BASE_LEAD = 8
+STATE_BOND_BASE_PHONON = 0
+PRIMITIVE_BASIS_BASE_LEAD = 4
+PRIMITIVE_BASIS_BASE_PHONON = 4
+```
 
 每个 `n_lead` 会生成四组 fermionic lead mode：
 
@@ -260,7 +283,103 @@ balanced, n_lead=64, n_phonon=16:
   n_sop_terms = 832
 ```
 
+## Step 5.2：最终三 panel PDF
+
+当前 publication plotter：
+
+```text
+benchmarks/plot_operator_env_scaling.py
+```
+
+输出单个 PDF：
+
+```text
+<output-prefix>_scaling_three_panel.pdf
+```
+
+三个 panel 分别使用：
+
+```text
+N panel:   x_axis = n_total_sites
+M_s panel: x_axis = state_max_bond
+d panel:   x_axis = primitive_basis_dim
+```
+
+正式图只包含：
+
+```text
+sop_no_env
+sop_mctdh_like_state_env
+ttno_with_env
+```
+
+`sop_env_plus_operator_cache` 不进入最终图。固定参考线画为虚线但不进入
+legend，标注直接放在线旁。当前约定：
+
+```text
+N panel:   no-env N^3, strict SOP N^2, TTNO N^1
+M_s panel: 三种方法均画 M_s^3
+d panel:   两条 SOP 画常数，TTNO 画 d^4
+```
+
+`M_s` 和 `d` 参考线只覆盖后半数据，并与各曲线最后一个可用点重合。它们用于
+帮助读图，不是拟合值，也不能替代对 Ren.J.2022 指数差异的解释。legend 放在第一
+个 panel 内部，顶部不显示 fit alpha。
+
 `ttno_max_bond` 是同一个 Hamiltonian 被压缩为 TTNO 后最大的 operator bond dimension。它反映 TTNO 是否成功共享了 SOP terms 之间的重复 operator structure；在 `large_114126` 结果中一直是 `7`。
+
+## Step 5.3：长作业增量落盘
+
+`run_benchmark()` 在每个 repeat 完成后原子更新 raw CSV，在每个 size point
+完成后更新 fit CSV。Slurm time limit 或外部中断最多丢失当前 repeat，已经完成
+的 repeat 不应再像 job 114439 一样全部丢失。
+
+长时间的 `lead_only` all-nodes 测试应按尺寸拆分作业。`n_lead=32` 已经需要
+数小时，不应与 `n_lead=64/128` 放在同一个 12 小时 allocation 中。
+
+只有 `N_site` panel 的 `N^3/N^2/N` 是本 benchmark strict algorithm identity
+直接支持的复杂度口径。Ren.J.2022 中的 `M_s^4` 和 `d^2` 分别属于 binary
+ML-MCTDH 和 MPS TD-DMRG 的特定实现/计算对象，不能直接映射到本仓库三种
+Tree operator representation。当前图上的 `M_s^3` 和 TTNO `d^4` 是已有数据的
+视觉参考，差异本身必须继续诊断。
+
+## Step 5.4：Ren-style formal Tree array
+
+正式参数清单在：
+
+```text
+benchmarks/ren_formal_manifest.py
+```
+
+参数固定为：
+
+```text
+N panel:   M_s=20, d=10, N_total_sites=18,30,46,74,118,186,300
+M_s panel: N_phonon=16, d=10, M_s=10,20,30,50,70,100,150,220,300
+d panel:   N_phonon=16, M_s=20, d=5,10,20,30,40,50,70,100
+```
+
+每个方法、点和 repeat 是一个独立 array task：
+
+```bash
+sbatch benchmarks/scripts/curie_cpu_ren_formal_array.sbatch
+```
+
+runner 必须用 module mode 启动：
+
+```bash
+python -m benchmarks.run_ren_formal_point ...
+```
+
+不要改回 `python benchmarks/run_ren_formal_point.py`，否则在计算节点可能找不到
+`benchmarks` package。每个任务原子写到：
+
+```text
+benchmarks/results/operator_env_scaling/ren_formal/snapshots/<panel>/<method>/*.npz
+```
+
+NPZ 内保存 JSON payload 且 `allow_pickle=False`。聚合器必须允许缺失任务并明确
+列出缺口；只有 216/216 且全部 `status=ok` 才可命名为 final result。
 
 ## Step 5.2：alpha / scaling exponent 的含义
 
@@ -348,6 +467,40 @@ active_scope=all_nodes:
   TTNO with bounded operator bond expected ~ N
 ```
 
+## Step 5.3：最终发布图与结果目录
+
+当前正式发布数据源是 all-nodes job 114336：
+
+```text
+benchmarks/results/operator_env_scaling/final/
+  strict_all_nodes_medium_114336_raw.csv
+  strict_all_nodes_medium_114336_summary.csv
+  strict_all_nodes_medium_114336_fits.csv
+  strict_all_nodes_medium_114336_scaling_vs_nsite.pdf
+```
+
+PDF 只显示：
+
+```text
+sop_no_env
+sop_mctdh_like_state_env
+ttno_with_env
+```
+
+横轴固定为 `N_total_sites`，图中用虚线给出 `alpha=3,2,1` 的理论斜率
+参考。`sop_env_plus_operator_cache` 是实现过程中的中间路径，保留在 raw
+CSV 和开发归档中，但不进入正式图。
+
+历史结果按 timing object 归档到：
+
+```text
+benchmarks/results/operator_env_scaling/archive/root_one_site_legacy/
+benchmarks/results/operator_env_scaling/archive/strict_all_nodes_development/
+benchmarks/results/operator_env_scaling/archive/legacy_sop_vs_ttno/
+```
+
+不要因为 root-only run 使用 `large` profile 就把它当作最终 scaling 结果。
+
 ## Step 6：Slurm CPU benchmark
 
 不要在登录节点直接运行正式 benchmark。使用 CPU-only Slurm 脚本：
@@ -389,9 +542,9 @@ sbatch benchmarks/scripts/curie_cpu_adaptive_operator_env.sbatch
 
 输出：
 
-- raw CSV：`benchmarks/results/adaptive_operator_env/<profile>_<jobid>_raw.csv`
-- fit CSV：`benchmarks/results/adaptive_operator_env/<profile>_<jobid>_fits.csv`
-- log-log time plots 和 operator diagnostics plots。
+- raw CSV：`benchmarks/results/operator_env_scaling/runs/<profile>_<jobid>_raw.csv`
+- fit CSV：`benchmarks/results/operator_env_scaling/runs/<profile>_<jobid>_fits.csv`
+- run-level PNG diagnostics（只用于筛选，不作为正式图）。
 
 正式画图使用 plot 环境：
 
@@ -399,11 +552,12 @@ sbatch benchmarks/scripts/curie_cpu_adaptive_operator_env.sbatch
 env MPLCONFIGDIR=/tmp/matplotlib-operator-env \
 conda run -p /software/cache/yuxiong/plot \
 python benchmarks/plot_operator_env_scaling.py \
-  --raw benchmarks/results/adaptive_operator_env/large_114126_raw.csv \
-  --output-prefix benchmarks/results/adaptive_operator_env/large_114126_formal
+  --raw benchmarks/results/operator_env_scaling/final/strict_all_nodes_medium_114336_raw.csv \
+  --output-prefix benchmarks/results/operator_env_scaling/final/strict_all_nodes_medium_114336
 ```
 
-生成 PNG/PDF、mean summary CSV 和 mean-fit CSV。
+生成 summary CSV、fit CSV 和一张 PDF，不生成 PNG。当前正式 plotter 只接受
+all-nodes 数据，并排除 `sop_env_plus_operator_cache`。
 
 `sanity` profile 只有两个尺寸点，fit CSV 会输出 exponent，但 `stable_vs_large=False`，不能拿来做 scaling 结论。
 

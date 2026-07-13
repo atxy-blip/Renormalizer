@@ -52,10 +52,10 @@ The molecular-junction benchmark cases are small parameterized variants of
 `../ttns-test/junction_zt_hubbard.py`, the Hubbard junction script used for the paper calculations. The benchmark does not import that script directly because it performs argument parsing, logging setup, TTNO construction, TTNS expansion, and time evolution at module import time; instead it reuses the same symbolic operator/tree construction pattern at reduced sizes.
 
 ```bash
-conda run -n reno-3.9 python benchmarks/benchmark_sop_vs_ttno.py --case lead --lead-list 1 2 4 8 16 32 --phonon 2 --repeats 7 --output benchmarks/results/lead_scaling.csv
-conda run -n reno-3.9 python benchmarks/benchmark_sop_vs_ttno.py --case phonon --lead 4 --phonon-list 1 2 4 8 16 32 --repeats 7 --output benchmarks/results/phonon_scaling.csv
-conda run -n reno-3.9 python benchmarks/benchmark_sop_vs_ttno.py --case shared-structure --size-list 4 8 16 32 64 --rank-list 1 2 4 --repeats 7 --output benchmarks/results/shared_structure_scaling.csv
-conda run -n reno-3.9 python benchmarks/create_sop_vs_ttno_notebook.py
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case lead --lead-list 1 2 4 8 16 32 --phonon 2 --repeats 7 --output benchmarks/results/lead_scaling.csv
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case phonon --lead 4 --phonon-list 1 2 4 8 16 32 --repeats 7 --output benchmarks/results/phonon_scaling.csv
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py --case shared-structure --size-list 4 8 16 32 64 --rank-list 1 2 4 --repeats 7 --output benchmarks/results/shared_structure_scaling.csv
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/create_sop_vs_ttno_notebook.py
 ```
 
 Default arguments are intentionally smaller than the full scaling commands.
@@ -73,7 +73,7 @@ recommended longer scaling runs.
 For denser scaling data on Curie, use the Slurm array script:
 
 ```bash
-sbatch benchmarks/scripts/curie_sop_vs_ttno_array.sh
+sbatch benchmarks/archive/legacy_sop_vs_ttno/curie_sop_vs_ttno_array.sh
 ```
 
 The script launches one benchmark point per array task and writes per-point CSV
@@ -91,14 +91,14 @@ points should be run only after inspecting the `size=16` timings.
 Useful overrides are environment variables passed to `sbatch`:
 
 ```bash
-sbatch --export=ALL,REPEATS=5,TIMEOUT_PER_POINT=3h benchmarks/scripts/curie_sop_vs_ttno_array.sh
+sbatch --export=ALL,REPEATS=5,TIMEOUT_PER_POINT=3h benchmarks/archive/legacy_sop_vs_ttno/curie_sop_vs_ttno_array.sh
 ```
 
 After the array finishes, merge per-point CSV files and rebuild the notebook:
 
 ```bash
-conda run -n reno-3.9 python benchmarks/merge_sop_vs_ttno_results.py
-conda run -n reno-3.9 python benchmarks/create_sop_vs_ttno_notebook.py
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/merge_sop_vs_ttno_results.py
+conda run -n reno-3.9 python benchmarks/archive/legacy_sop_vs_ttno/create_sop_vs_ttno_notebook.py
 ```
 
 ## Output Fields
