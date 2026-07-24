@@ -137,12 +137,16 @@ def time_limit(seconds: int):
         signal.signal(signal.SIGALRM, old_handler)
 
 
-def _binary_or_dummy(basis_list, label):
+def _binary_or_dummy(basis_list, label, contract_primitive=False):
     if len(basis_list) == 0:
         return TreeNodeBasis([BasisDummy((label, "empty"))])
     if len(basis_list) == 1:
         return TreeNodeBasis([basis_list[0]])
-    return BasisTree.binary_mctdh(basis_list, dummy_label=label).root
+    return BasisTree.binary_mctdh(
+        basis_list,
+        contract_primitive=contract_primitive,
+        dummy_label=label,
+    ).root
 
 
 def build_hubbard_junction_case(
@@ -159,6 +163,7 @@ def build_hubbard_junction_case(
     initial_occupied: bool = False,
     max_phonon_basis: int = 4,
     force_phonon_basis: int = None,
+    phonon_contract_primitive: bool = False,
 ):
     """Build the Hubbard junction tree, including the n_phonon=0 lead-only case."""
 
@@ -269,7 +274,11 @@ def build_hubbard_junction_case(
         ]
     else:
         basis_list_phonon = []
-    basis_tree_phonon_root = _binary_or_dummy(basis_list_phonon, "phonon-dummy")
+    basis_tree_phonon_root = _binary_or_dummy(
+        basis_list_phonon,
+        "phonon-dummy",
+        contract_primitive=phonon_contract_primitive,
+    )
 
     node1 = TreeNodeBasis([basis[su_idx]])
     node1.add_child([basis_tree_l_root, basis_tree_r_root])
