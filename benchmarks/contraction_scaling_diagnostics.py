@@ -140,7 +140,9 @@ def write_manifest(path, repeats=3):
     tasks = diagnostic_tasks(repeats=repeats)
     fieldnames = [field.name for field in DiagnosticTask.__dataclass_fields__.values()]
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+        writer = csv.DictWriter(
+            f, fieldnames=fieldnames, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(asdict(task) for task in tasks)
     return tasks

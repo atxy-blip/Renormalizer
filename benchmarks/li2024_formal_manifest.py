@@ -69,7 +69,9 @@ def write_manifest(path, repeats=3):
     tasks = formal_tasks(repeats=repeats)
     fields = [field.name for field in Li2024Task.__dataclass_fields__.values()]
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fields, delimiter="\t")
+        writer = csv.DictWriter(
+            f, fieldnames=fields, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(asdict(task) for task in tasks)
     return tasks
