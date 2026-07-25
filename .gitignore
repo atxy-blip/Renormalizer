@@ -34,3 +34,4 @@ dist/
 *.csv
 temp
 .llmdoc-tmp/
+.worktrees/
