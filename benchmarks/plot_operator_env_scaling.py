@@ -46,9 +46,7 @@ METHOD_COLORS = {
 }
 LEGEND_KWARGS = {
     "loc": "upper left",
-    "fontsize": 8,
-    "frameon": True,
-    "framealpha": 0.9,
+    "frameon": False,
 }
 
 

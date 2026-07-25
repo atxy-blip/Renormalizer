@@ -84,6 +84,8 @@ def test_panels_have_fixed_theoretical_reference_slopes():
 
 def test_legend_is_positioned_inside_first_panel():
     assert LEGEND_KWARGS["loc"] == "upper left"
+    assert LEGEND_KWARGS["frameon"] is False
+    assert "fontsize" not in LEGEND_KWARGS
     assert "bbox_to_anchor" not in LEGEND_KWARGS
 
 

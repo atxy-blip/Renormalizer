@@ -244,7 +244,7 @@ def plot(summary, output_prefix):
             finish_axis(ax)
 
         axes[0].set_ylabel("All-node local-action wall time (s)")
-        axes[0].legend(loc="upper left", framealpha=0.9)
+        axes[0].legend(loc="upper left", frameon=False)
         pdf_path = output_prefix.with_name(
             output_prefix.name + "_scaling_three_panel.pdf"
         )
