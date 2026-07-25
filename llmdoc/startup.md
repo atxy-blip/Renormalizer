@@ -39,3 +39,8 @@ scaling 解释必须区分 timing object：
 - `llmdoc/architecture/op-to-contraction.md`
 - `llmdoc/architecture/ttns-ttno-environment.md`
 - `llmdoc/guides/sop-environment-benchmark-flow.md`
+
+继续分析或提交 scaling benchmark 前，还应读：
+
+- `llmdoc/overview/scaling-benchmark-status.md`
+- `llmdoc/architecture/primitive-contraction-scaling.md`

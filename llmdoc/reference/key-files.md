@@ -59,6 +59,37 @@
   - `SOPOneSiteEffective`：one-site branch environment，可选 operator signature cache。
   - `SOPMCTDHSweepEnvironment`：strict per-term directed-edge state environment。
   - `_run_point()`：运行选定方法并拆分 env/apply/total timing。
+  - `build_hubbard_junction_case()`：支持 `phonon_contract_primitive` tree-layout 开关。
+
+- `benchmarks/benchmark_li2024_operator_env.py`
+  - 构造 sub-Ohmic spin-boson Hamiltonian 和 adaptive binary tree。
+  - `run_li2024_point()`：运行三条 operator path 中的一个 formal point。
+
+- `benchmarks/li2024_formal_manifest.py`
+  - 定义 21 个参数点、3 个方法、3 个 repeats，共 189 个 array tasks。
+  - `uses_primitive_contraction()`：固定 `d > M_s` topology 规则。
+
+- `benchmarks/run_li2024_formal_point.py`
+  - 运行单个 Li formal task，并原子写 JSON-backed NPZ。
+
+- `benchmarks/finalize_li2024_formal.py`
+  - 检查 189 个 task IDs，只有全部 `status=ok` 时才生成 final aggregate 和 PDF。
+
+- `benchmarks/plot_li2024_operator_scaling.py`
+  - 聚合 repeat，拟合 all/largest-four 窗口，绘制三 panel PDF。
+
+- `benchmarks/contraction_scaling_diagnostics.py`
+  - 定义 internal-`M_s`、leaf-`d` 和 full-model-`d` 六类 controls。
+  - `kernel_path_metrics()`：记录 optimized FLOPs 和 largest intermediate。
+
+- `benchmarks/run_contraction_scaling_diagnostic.py`
+  - 运行 isolated dense kernel 或 paired/contracted full-model control。
+
+- `benchmarks/summarize_contraction_scaling_diagnostics.py`
+  - 按 repeats 取 median/std，并生成 all/largest-four scaling fits。
+
+- `benchmarks/plot_contraction_scaling_diagnostics.py`
+  - 生成 complexity validation 和 full-model mechanism 两组图。
 
 - `benchmarks/ren_formal_manifest.py`
   - 定义 Ren-style Tree benchmark 的 `N_site/M_s/d` 参数和 216 个 array tasks。
@@ -80,6 +111,15 @@
 
 - `renormalizer/tn/tests/test_ren_formal_benchmark.py`
   - formal manifest、snapshot 原子落盘和 task runner 测试。
+
+- `renormalizer/tn/tests/test_li2024_formal_benchmark.py`
+  - Li formal manifest、adaptive topology、small-point correctness 和 Slurm wrapper 测试。
+
+- `renormalizer/tn/tests/test_contraction_scaling_diagnostics.py`
+  - 精确 `M_s^4/d^4/d^2` path metrics、model topology、snapshot 和 summary 测试。
+
+- `renormalizer/tn/tests/test_plot_contraction_scaling_diagnostics.py`
+  - numeric sorting、tail fit 和 figure artifact 测试。
 
 - `benchmarks/archive/legacy_sop_vs_ttno/benchmark_sop_vs_ttno.py`
   - 历史 full-state flat SOP vs TTNO apply benchmark。

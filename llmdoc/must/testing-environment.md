@@ -237,3 +237,46 @@ d panel:   N_phonon=16, M_s=20, d=5 10 20 30 40 50 70 100
 ```text
 benchmarks/results/operator_env_scaling/final/ren_formal_partial_20260713_scaling_three_panel.pdf
 ```
+
+## Curie shell 激活顺序
+
+Slurm wrapper 必须在启用 nounset 前完成 Curie 环境初始化：
+
+```bash
+source /software/envs/bash.profile
+source /software/envs/anaconda3.env
+conda activate reno-3.9
+set -u
+```
+
+contraction diagnostic 初始 array `115387` 的 tasks 8--143 因顺序相反而在
+conda activation 阶段失败。修正后的 replacement array `115549` 成功补齐，
+最终为 144/144 个 `status=ok` snapshots。生产 array 前应先提交一个
+compute-node smoke task，并检查它实际生成 snapshot。
+
+## 最新完成的正式任务
+
+Contraction diagnostics：
+
+```text
+initial: 115387, tasks 0--7 completed
+replacement: 115549, tasks 8--143 completed
+summary: 115555
+final snapshots: 144 / 144, all ok
+```
+
+Li.W.2024 spin-boson rerun：
+
+```text
+compute-node smoke: 115694
+production array: 115695
+finalizer: 115708
+final snapshots: 189 / 189, all ok
+```
+
+这两组结果和当前验证命令见：
+
+```text
+llmdoc/overview/scaling-benchmark-status.md
+benchmarks/results/operator_env_scaling/runs/README.md
+```

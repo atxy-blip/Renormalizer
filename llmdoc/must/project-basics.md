@@ -8,7 +8,17 @@ Renormalizer 是面向电子-声子量子动力学的 Python 张量网络包。�
 /curie-home/yuxiong/Reno-quantity
 ```
 
-当前分支背景是 `feat/mctdh-sop-comparison`，上一个 commit `5fbf5a1 Update SOP operator` 新增了 flat SOP baseline、SOP vs TTNO benchmark、相关测试和说明文档。
+当前分支是 `feat/mctdh-sop-comparison`。commit `5fbf5a1 Update SOP operator`
+引入 flat SOP baseline；commit `7c974c0 Update benchmarks` 已加入 strict
+MCTDH-like all-node benchmark、recoverable formal array 和历史结果归档。
+
+当前阶段已进一步完成：
+
+- 144/144 contraction-complexity diagnostics；
+- 189/189 Li.W.2024 spin-boson operator-scaling rerun；
+- paired primitive leaf `d^4` 与 primitive-contracted `d^2` 的机制诊断。
+
+当前进度入口是 `llmdoc/overview/scaling-benchmark-status.md`。
 
 ## 术语约定
 

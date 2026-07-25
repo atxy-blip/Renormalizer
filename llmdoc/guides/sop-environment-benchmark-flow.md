@@ -561,6 +561,61 @@ all-nodes 数据，并排除 `sop_env_plus_operator_cache`。
 
 `sanity` profile 只有两个尺寸点，fit CSV 会输出 exponent，但 `stable_vs_large=False`，不能拿来做 scaling 结论。
 
+## Step 7：Contraction diagnostics
+
+当 full-model wall-time exponent 与预期 tensor-index complexity 不一致时，不要
+直接调整参考线。使用三层诊断：
+
+```text
+1. shape-only optimized FLOPs / largest intermediate
+2. isolated dense-kernel wall time
+3. full-model storage, memory, build/env/apply stage timing
+```
+
+当前入口：
+
+```bash
+sbatch benchmarks/scripts/curie_cpu_contraction_scaling_diagnostics.sbatch
+```
+
+manifest 有 144 个独立任务。聚合和作图分别使用：
+
+```bash
+sbatch benchmarks/scripts/curie_cpu_contraction_scaling_summary.sbatch
+conda run -n reno-3.9 python -m benchmarks.plot_contraction_scaling_diagnostics ...
+```
+
+正式解释见 `llmdoc/architecture/primitive-contraction-scaling.md`。
+
+## Step 8：Li.W.2024 spin-boson formal rerun
+
+模型和 adaptive topology：
+
+```text
+sub-Ohmic: s=0.5, omega_c=20 Delta, alpha=0.05, Delta=1
+modes:      N_b=4,8,16,32,64,128,256; M_s=20; d=10
+state bond: M_s=4,8,16,32,50,70,100; N_b=16; d=10
+primitive:  d=4,8,16,32,50,70,100; N_b=16; M_s=20
+contract primitive exactly when d > M_s
+```
+
+工作流：
+
+```bash
+conda run -n reno-3.9 python -m benchmarks.li2024_formal_manifest \
+  --output benchmarks/results/operator_env_scaling/li2024_formal/manifest.tsv
+
+sbatch benchmarks/scripts/curie_cpu_li2024_formal_array.sbatch
+sbatch benchmarks/scripts/curie_cpu_li2024_formal_finalize.sbatch
+```
+
+每个 `(panel, method, point, repeat)` 原子写一个 snapshot。finalizer 只有在
+189/189 task IDs 全部存在且 `status=ok` 时才输出 final aggregate/PDF。
+
+注意：primitive contraction 会改变 tree topology 和 active-node 数。跨 topology
+switch 的全区间 fit 只描述 end-to-end workflow；解释 large-`d` complexity 时必须
+同时引用 isolated leaf FLOPs 和 TTNO storage。
+
 ## 风险与 fallback
 
 - 如果通用 tree branch signature 太复杂，先固定 active node 为 junction bridge/root 附近节点。

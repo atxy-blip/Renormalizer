@@ -58,10 +58,11 @@ all_nodes, fit vs n_lead, large-only:
 
 `sop_env_plus_operator_cache` 目前是 per-active-node branch signature cache path，不是完整 sweep-level operator-cache baseline。
 
-## 2026-07-13 formal three-variable benchmark
+## Legacy 2026-07-13 Hubbard-junction formal benchmark
 
 正式数组固定比较 `sop_no_env`、`sop_mctdh_like_state_env` 和
-`ttno_with_env`，每个点 3 repeats。当前为 204/216 个 `status=ok` 快照，缺少
+`ttno_with_env`，每个点 3 repeats。该 legacy 数据集为 204/216 个
+`status=ok` 快照，缺少
 `N=300` 的 no-env 和 `M_s=300` 的全部方法，仍属于 partial result。
 
 现有数据支持：
@@ -86,3 +87,61 @@ large d window:
 `local_effective_1site_apply_all_nodes`。为什么 strict Tree SOP 没有显示 binary
 ML-MCTDH 的 `M_s^4`，以及为什么 Tree TTNO 没有显示论文 TD-DMRG 的 `d^2`，仍需
 用实际 tensor shape、QN block、opt_einsum FLOP/path 和 full-step timing 诊断。
+
+该 204/216 数据集现在作为 legacy partial result 保留。后续已改用
+Li.W.2024 sub-Ohmic spin-boson model 和 adaptive primitive contraction 做正式重跑。
+
+## 当前诊断结论
+
+144-task contraction diagnostic 已闭合两个 tensor-shape 问题：
+
+```text
+full-rank binary internal node:
+  optimized FLOPs ~ M_s^4
+
+paired two-mode phonon leaf:
+  operator tensor/storage ~ d^4
+
+primitive-contracted one-mode leaf:
+  operator tensor/storage ~ d^2
+```
+
+因此旧 Hubbard tree 的 `d^4` 来自每个 leaf 合并两个 primitive modes 后产生的
+四个 physical operator axes，不是 TTNO 一般性质。旧 `M_s^3` 是有限测试区间的
+wall-time exponent；isolated shape-only kernel 的数学 FLOP 次数是 `M_s^4`。
+
+## 当前正式 Li.W.2024 spin-boson rerun
+
+正式 rerun 有 189/189 个 `status=ok` snapshots，比较相同三条 operator path，
+每个参数点 3 repeats。测量对象仍是：
+
+```text
+quantity = local_effective_1site_apply_all_nodes
+```
+
+largest-four-point wall-time fit：
+
+```text
+N_b:
+  sop_no_env                  3.109
+  sop_mctdh_like_state_env    2.035
+  ttno_with_env               0.916
+
+M_s:
+  sop_no_env                  2.180
+  sop_mctdh_like_state_env    2.243
+  ttno_with_env               2.223
+
+large d, with primitive contraction when d > M_s:
+  all three methods           approximately constant
+```
+
+`N_b` panel 支持 `N_b^3/N_b^2/N_b` operator/state reuse 口径。`M_s` panel 的约
+2.2 仍是 whole-workflow wall-time 有效指数，不能替代 internal contraction 的
+`M_s^4` FLOP 结论。大 `d` whole-workflow 近常数是固定 body-tree work 主导，
+isolated leaf 和 TTNO storage 仍渐近 `d^2`。
+
+详情：
+
+- `llmdoc/overview/scaling-benchmark-status.md`
+- `llmdoc/architecture/primitive-contraction-scaling.md`
