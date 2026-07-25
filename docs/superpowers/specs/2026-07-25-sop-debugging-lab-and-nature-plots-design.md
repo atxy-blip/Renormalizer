@@ -102,7 +102,7 @@ E_{l,u\rightarrow v}
 \right).
 \]
 
-Observe cache keys of the form `(term_index, source, target)`, both directions
+Observe cache keys of the form `(source, target, term_index)`, both directions
 of a tree edge, cache cardinality, and reuse of messages when the active node
 changes.
 
@@ -243,4 +243,3 @@ Add an llmdoc guide for the debugging lab and a plotting-style reference for
 this repository. Link both from `llmdoc/index.md` and record the notebook,
 shared style module, refactored plotters, output locations, execution command,
 and scientific interpretation boundary.
-
