@@ -17,6 +17,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from benchmarks.li2024_formal_manifest import FORMAL_METHODS
+from benchmarks.nature_plot_style import (
+    METHOD_STYLES,
+    finish_axis,
+    label_panel,
+    nature_style,
+    save_pdf_png,
+)
 
 
 METHOD_LABELS = {
@@ -25,9 +32,8 @@ METHOD_LABELS = {
     "ttno_with_env": "TTNO with env",
 }
 METHOD_COLORS = {
-    "sop_no_env": "#a23b3b",
-    "sop_mctdh_like_state_env": "#a06a16",
-    "ttno_with_env": "#2f7d46",
+    method: METHOD_STYLES[method]["color"]
+    for method in FORMAL_METHODS
 }
 REFERENCE_POWERS = {
     "modes": {
@@ -50,9 +56,9 @@ class Panel:
 
 
 PANELS = (
-    Panel("modes", "n_modes", r"Number of modes, $N_b$", r"Mode number $N_b$", "N_b"),
-    Panel("state_bond", "target_state_bond", r"State bond dimension, $M_s$", r"State bond $M_s$", "M_s"),
-    Panel("primitive_basis", "primitive_basis_dim", r"Primitive basis, $d$", r"Primitive basis $d$", "d"),
+    Panel("modes", "n_modes", r"Number of modes, $N_b$", "Mode number", "N_b"),
+    Panel("state_bond", "target_state_bond", r"State bond dimension, $M_s$", "State bond", "M_s"),
+    Panel("primitive_basis", "primitive_basis_dim", r"Primitive basis, $d$", "Primitive basis", "d"),
 )
 
 
@@ -177,68 +183,74 @@ def _guide_label(symbol, power):
 
 
 def plot(summary, output_prefix):
-    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.2), sharey=True)
-    for ax, panel in zip(axes, PANELS):
-        all_x = []
-        for method in FORMAL_METHODS:
-            points = sorted(
-                (
-                    row for row in summary
-                    if row["panel"] == panel.name and row["method"] == method
-                ),
-                key=lambda row: float(row[panel.x_field]),
-            )
-            if not points:
-                continue
-            x = np.asarray([float(row[panel.x_field]) for row in points])
-            y = np.asarray([float(row["time_total_mean_sec"]) for row in points])
-            yerr = np.asarray([float(row["time_total_std_sec"]) for row in points])
-            color = METHOD_COLORS[method]
-            ax.errorbar(
-                x,
-                y,
-                yerr=yerr,
-                marker="o",
-                markersize=5,
-                linewidth=1.4,
-                capsize=2,
-                color=color,
-                label=METHOD_LABELS[method],
-            )
+    with nature_style():
+        fig, axes = plt.subplots(1, 3, figsize=(10.5, 2.8), sharey=True)
+        fig.subplots_adjust(
+            left=0.075,
+            right=0.985,
+            bottom=0.20,
+            top=0.90,
+            wspace=0.10,
+        )
+        for panel_index, (ax, panel) in enumerate(zip(axes, PANELS)):
+            all_x = []
+            for method in FORMAL_METHODS:
+                points = sorted(
+                    (
+                        row for row in summary
+                        if row["panel"] == panel.name and row["method"] == method
+                    ),
+                    key=lambda row: float(row[panel.x_field]),
+                )
+                if not points:
+                    continue
+                x = np.asarray([float(row[panel.x_field]) for row in points])
+                y = np.asarray([float(row["time_total_mean_sec"]) for row in points])
+                yerr = np.asarray([float(row["time_total_std_sec"]) for row in points])
+                style = METHOD_STYLES[method]
+                color = style["color"]
+                ax.errorbar(
+                    x,
+                    y,
+                    yerr=yerr,
+                    capsize=2,
+                    label=METHOD_LABELS[method],
+                    **style,
+                )
 
-            power = REFERENCE_POWERS[panel.name][method]
-            ref_x = x if panel.name == "modes" else x[len(x) // 2 :]
-            ref_y = y[-1] * (ref_x / ref_x[-1]) ** power
-            ax.plot(ref_x, ref_y, linestyle="--", linewidth=1.2, color=color, alpha=0.7)
-            ax.annotate(
-                _guide_label(panel.symbol, power),
-                xy=(ref_x[-1], ref_y[-1]),
-                xytext=(3, 0),
-                textcoords="offset points",
-                color=color,
-                fontsize=8,
-                va="center",
-            )
-            all_x.extend(x.tolist())
+                power = REFERENCE_POWERS[panel.name][method]
+                ref_x = x if panel.name == "modes" else x[len(x) // 2 :]
+                ref_y = y[-1] * (ref_x / ref_x[-1]) ** power
+                ax.plot(ref_x, ref_y, linestyle="--", color=color, alpha=0.7)
+                ax.text(
+                    0.97,
+                    ref_y[-1],
+                    _guide_label(panel.symbol, power),
+                    transform=ax.get_yaxis_transform(),
+                    color=color,
+                    ha="right",
+                    va="center",
+                    clip_on=True,
+                )
+                all_x.extend(x.tolist())
 
-        ax.set_xscale("log", base=2)
-        ax.set_yscale("log")
-        if all_x:
-            ax.set_xticks(sorted(set(all_x)))
-            ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-        ax.set_xlabel(panel.xlabel)
-        ax.set_title(panel.title)
-        ax.grid(True, which="both", linewidth=0.55, alpha=0.25)
+            ax.set_xscale("log", base=2)
+            ax.set_yscale("log")
+            if all_x:
+                ax.set_xticks(sorted(set(all_x)))
+                ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+            ax.set_xlabel(panel.xlabel)
+            label_panel(ax, chr(ord("a") + panel_index), panel.title)
+            finish_axis(ax)
 
-    axes[0].set_ylabel("All-node local-action wall time (s)")
-    axes[0].legend(loc="upper left", fontsize=8, framealpha=0.9)
-    fig.suptitle("Li.W.2024 spin--boson setup: operator-kernel scaling", y=1.04)
-    fig.tight_layout()
-    output = output_prefix.with_name(output_prefix.name + "_scaling_three_panel.pdf")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, bbox_inches="tight")
-    plt.close(fig)
-    return output
+        axes[0].set_ylabel("All-node local-action wall time (s)")
+        axes[0].legend(loc="upper left", framealpha=0.9)
+        pdf_path = output_prefix.with_name(
+            output_prefix.name + "_scaling_three_panel.pdf"
+        )
+        pdf, png = save_pdf_png(fig, pdf_path)
+        plt.close(fig)
+    return pdf, png
 
 
 def generate(rows, output_prefix):
@@ -253,8 +265,8 @@ def generate(rows, output_prefix):
     fits = compute_fits(summary)
     _write_csv(output_prefix.with_name(output_prefix.name + "_summary.csv"), summary)
     _write_csv(output_prefix.with_name(output_prefix.name + "_fits.csv"), fits)
-    pdf = plot(summary, output_prefix)
-    return summary, fits, pdf
+    pdf, png = plot(summary, output_prefix)
+    return summary, fits, pdf, png
 
 
 def main():
@@ -262,8 +274,11 @@ def main():
     parser.add_argument("--raw", type=Path, required=True)
     parser.add_argument("--output-prefix", type=Path, required=True)
     args = parser.parse_args()
-    summary, fits, pdf = generate(read_raw(args.raw), args.output_prefix)
-    print(f"Wrote {len(summary)} summary rows, {len(fits)} fits, and {pdf}")
+    summary, fits, pdf, png = generate(read_raw(args.raw), args.output_prefix)
+    print(
+        f"Wrote {len(summary)} summary rows, {len(fits)} fits, "
+        f"and figures {pdf} and {png}"
+    )
 
 
 if __name__ == "__main__":

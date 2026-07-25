@@ -16,6 +16,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from benchmarks.nature_plot_style import (
+    METHOD_STYLES,
+    finish_axis,
+    label_panel,
+    nature_style,
+    save_pdf_png,
+)
+
 
 PUBLICATION_METHODS = (
     "sop_no_env",
@@ -33,9 +41,8 @@ METHOD_LABELS = {
     "ttno_with_env": "TTNO with env",
 }
 METHOD_COLORS = {
-    "sop_no_env": "#a23b3b",
-    "sop_mctdh_like_state_env": "#a06a16",
-    "ttno_with_env": "#2f7d46",
+    method: METHOD_STYLES[method]["color"]
+    for method in PUBLICATION_METHODS
 }
 LEGEND_KWARGS = {
     "loc": "upper left",
@@ -357,70 +364,118 @@ def validate_publication_input(rows):
 
 
 def plot_publication_time(summary, fits, output_prefix):
-    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.1), sharey=True)
-    legend_handles = []
-    legend_labels = []
-    for ax, panel in zip(axes, SCALING_PANELS):
-        path = panel_path(summary, panel)
-        reference_alpha = dict(panel.reference_alpha_by_method)
-        if path is None:
-            ax.text(0.5, 0.5, "not measured", transform=ax.transAxes, ha="center", va="center")
-            ax.set_title(panel.title)
-            ax.set_xlabel(panel.xlabel)
-            ax.grid(True, which="both", linewidth=0.6, alpha=0.25)
-            continue
-
-        all_x = []
-        for method in PUBLICATION_METHODS:
-            pts = [
-                r for r in path_method_points(summary, path, method)
-                if float(r[panel.x_axis]) > 0 and float(r["time_total_mean_sec"]) > 0
-            ]
-            pts.sort(key=lambda r: float(r[panel.x_axis]))
-            if len(pts) < 2:
-                continue
-            x = np.asarray([float(p[panel.x_axis]) for p in pts])
-            y = np.asarray([float(p["time_total_mean_sec"]) for p in pts])
-            color = METHOD_COLORS[method]
-            label = method_legend_label(method)
-            scatter = ax.scatter(x, y, s=42, color=color, zorder=3, label=label)
-            if panel is SCALING_PANELS[0]:
-                legend_handles.append(scatter)
-                legend_labels.append(label)
-
-            if method in reference_alpha:
-                if panel is SCALING_PANELS[0]:
-                    x_ref, y_ref = reference_curve(x, y, reference_alpha[method])
-                else:
-                    x_ref, y_ref = reference_curve_last_half(x, y, reference_alpha[method])
-                ax.plot(x_ref, y_ref, linestyle="--", linewidth=1.5, color=color, alpha=0.75)
+    panel_titles = ("Site number", "State bond", "Primitive basis")
+    with nature_style():
+        fig, axes = plt.subplots(1, 3, figsize=(10.5, 2.8), sharey=True)
+        fig.subplots_adjust(
+            left=0.075,
+            right=0.985,
+            bottom=0.20,
+            top=0.90,
+            wspace=0.10,
+        )
+        legend_handles = []
+        legend_labels = []
+        for panel_index, (ax, panel, panel_title) in enumerate(
+            zip(axes, SCALING_PANELS, panel_titles)
+        ):
+            path = panel_path(summary, panel)
+            reference_alpha = dict(panel.reference_alpha_by_method)
+            if path is None:
                 ax.text(
-                    x_ref[-1],
-                    y_ref[-1],
-                    reference_annotation(panel.symbol, reference_alpha[method]),
-                    color=color,
-                    fontsize=8,
-                    ha="left",
+                    0.5,
+                    0.5,
+                    "not measured",
+                    transform=ax.transAxes,
+                    ha="center",
                     va="center",
                 )
-            all_x.extend(x)
+                ax.set_xlabel(panel.xlabel)
+                label_panel(ax, chr(ord("a") + panel_index), panel_title)
+                finish_axis(ax)
+                continue
 
-        ax.set_xscale("log", base=2)
-        ax.set_yscale("log")
-        if all_x:
-            ax.set_xticks(sorted(set(all_x)))
-            ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-        ax.set_xlabel(panel.xlabel)
-        ax.set_title(panel.title)
-        ax.grid(True, which="both", linewidth=0.6, alpha=0.25)
+            all_x = []
+            for method in PUBLICATION_METHODS:
+                pts = [
+                    r for r in path_method_points(summary, path, method)
+                    if float(r[panel.x_axis]) > 0
+                    and float(r["time_total_mean_sec"]) > 0
+                ]
+                pts.sort(key=lambda r: float(r[panel.x_axis]))
+                if len(pts) < 2:
+                    continue
+                x = np.asarray([float(p[panel.x_axis]) for p in pts])
+                y = np.asarray([float(p["time_total_mean_sec"]) for p in pts])
+                style = METHOD_STYLES[method]
+                color = style["color"]
+                label = method_legend_label(method)
+                marker_handle, = ax.plot(
+                    x,
+                    y,
+                    linestyle="none",
+                    label=label,
+                    **style,
+                )
+                if panel is SCALING_PANELS[0]:
+                    legend_handles.append(marker_handle)
+                    legend_labels.append(label)
 
-    axes[0].set_ylabel("Total wall time (s)")
-    if legend_handles:
-        axes[0].legend(legend_handles, legend_labels, **LEGEND_KWARGS)
-    fig.suptitle("Strict all-node operator scaling", y=1.08)
-    fig.tight_layout()
-    fig.savefig(output_prefix.with_name(f"{output_prefix.name}_scaling_three_panel.pdf"), bbox_inches="tight")
-    plt.close(fig)
+                if method in reference_alpha:
+                    if panel is SCALING_PANELS[0]:
+                        x_ref, y_ref = reference_curve(
+                            x,
+                            y,
+                            reference_alpha[method],
+                        )
+                    else:
+                        x_ref, y_ref = reference_curve_last_half(
+                            x,
+                            y,
+                            reference_alpha[method],
+                        )
+                    ax.plot(
+                        x_ref,
+                        y_ref,
+                        linestyle="--",
+                        color=color,
+                        alpha=0.75,
+                    )
+                    ax.text(
+                        0.97,
+                        y_ref[-1],
+                        reference_annotation(
+                            panel.symbol,
+                            reference_alpha[method],
+                        ),
+                        transform=ax.get_yaxis_transform(),
+                        color=color,
+                        ha="right",
+                        va="center",
+                        clip_on=True,
+                    )
+                all_x.extend(x)
+
+            ax.set_xscale("log", base=2)
+            ax.set_yscale("log")
+            if all_x:
+                ax.set_xticks(sorted(set(all_x)))
+                ax.get_xaxis().set_major_formatter(
+                    matplotlib.ticker.ScalarFormatter()
+                )
+            ax.set_xlabel(panel.xlabel)
+            label_panel(ax, chr(ord("a") + panel_index), panel_title)
+            finish_axis(ax)
+
+        axes[0].set_ylabel("Total wall time (s)")
+        if legend_handles:
+            axes[0].legend(legend_handles, legend_labels, **LEGEND_KWARGS)
+        pdf_path = output_prefix.with_name(
+            f"{output_prefix.name}_scaling_three_panel.pdf"
+        )
+        pdf, png = save_pdf_png(fig, pdf_path)
+        plt.close(fig)
+    return pdf, png
 
 
 def main():
@@ -435,11 +490,12 @@ def main():
     fits = compute_fits(summary)
     write_csv(args.output_prefix.with_name(f"{args.output_prefix.name}_summary.csv"), summary, SUMMARY_FIELDS)
     write_csv(args.output_prefix.with_name(f"{args.output_prefix.name}_fits.csv"), fits, FIT_FIELDS)
-    plot_publication_time(summary, fits, args.output_prefix)
+    pdf, png = plot_publication_time(summary, fits, args.output_prefix)
 
     print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_summary.csv')}")
     print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_fits.csv')}")
-    print(f"Wrote {args.output_prefix.with_name(args.output_prefix.name + '_scaling_three_panel.pdf')}")
+    print(f"Wrote {pdf}")
+    print(f"Wrote {png}")
 
 
 if __name__ == "__main__":

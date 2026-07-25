@@ -1,10 +1,14 @@
 import numpy as np
 
+from benchmarks.nature_plot_style import METHOD_STYLES
 from benchmarks.plot_operator_env_scaling import (
     PUBLICATION_METHODS,
     LEGEND_KWARGS,
+    METHOD_COLORS,
     REFERENCE_ALPHA,
     SCALING_PANELS,
+    compute_fits,
+    plot_publication_time,
     reference_annotation,
     reference_curve,
     reference_curve_last_half,
@@ -20,6 +24,13 @@ def test_publication_methods_exclude_operator_cache():
         "ttno_with_env",
     )
     assert "sop_env_plus_operator_cache" not in PUBLICATION_METHODS
+
+
+def test_publication_method_colors_match_shared_nature_palette():
+    assert METHOD_COLORS == {
+        method: METHOD_STYLES[method]["color"]
+        for method in PUBLICATION_METHODS
+    }
 
 
 def test_reference_curves_have_requested_log_log_slopes():
@@ -83,14 +94,22 @@ def test_reference_annotation_is_inline_proportional_label():
     assert reference_annotation("d", 0.0) == r"$\propto \mathrm{const}$"
 
 
-def _raw_row(method, scaling_path, state_max_bond=1, primitive_basis=2, elapsed=1.0):
+def _raw_row(
+    method,
+    scaling_path,
+    state_max_bond=1,
+    primitive_basis=2,
+    elapsed=1.0,
+    n_total_sites=20,
+    n_lead=4,
+):
     return {
         "status": "ok",
         "method": method,
         "scaling_path": scaling_path,
-        "n_lead": "4",
+        "n_lead": str(n_lead),
         "n_phonon": "2",
-        "n_total_sites": "20",
+        "n_total_sites": str(n_total_sites),
         "n_sop_terms": "56",
         "n_active_nodes": "29",
         "tree_depth": "6",
@@ -128,3 +147,37 @@ def test_summarize_keeps_state_bond_and_primitive_basis_points_distinct():
     assert sorted({row["primitive_basis_dim"] for row in basis_points}) == [4, 8]
     assert len(state_points) == 2 * len(PUBLICATION_METHODS)
     assert len(basis_points) == 2 * len(PUBLICATION_METHODS)
+
+
+def test_publication_plot_writes_paired_formal_outputs(tmp_path):
+    rows = []
+    for method in PUBLICATION_METHODS:
+        rows.extend([
+            _raw_row(
+                method,
+                "site_number",
+                n_total_sites=20,
+                n_lead=4,
+                elapsed=2.0,
+            ),
+            _raw_row(
+                method,
+                "site_number",
+                n_total_sites=36,
+                n_lead=8,
+                elapsed=4.0,
+            ),
+            _raw_row(method, "state_bond", state_max_bond=2, elapsed=2.0),
+            _raw_row(method, "state_bond", state_max_bond=4, elapsed=4.0),
+            _raw_row(method, "primitive_basis", primitive_basis=4, elapsed=4.0),
+            _raw_row(method, "primitive_basis", primitive_basis=8, elapsed=8.0),
+        ])
+
+    summary = summarize(rows)
+    fits = compute_fits(summary)
+    pdf, png = plot_publication_time(summary, fits, tmp_path / "ren")
+
+    assert pdf.name == "ren_scaling_three_panel.pdf"
+    assert png.name == "ren_scaling_three_panel.png"
+    assert pdf.stat().st_size > 0
+    assert png.stat().st_size > 0

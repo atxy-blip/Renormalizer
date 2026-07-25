@@ -1,12 +1,13 @@
 import json
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 from benchmarks.benchmark_li2024_operator_env import (
     build_li2024_spin_boson_case,
     run_li2024_point,
 )
-from benchmarks.finalize_li2024_formal import missing_task_ids
+from benchmarks.finalize_li2024_formal import main as finalize_main, missing_task_ids
 from benchmarks.li2024_formal_manifest import (
     FORMAL_METHODS,
     MODE_VALUES,
@@ -15,7 +16,7 @@ from benchmarks.li2024_formal_manifest import (
     formal_tasks,
     uses_primitive_contraction,
 )
-from benchmarks.plot_li2024_operator_scaling import REFERENCE_POWERS, summarize
+from benchmarks.plot_li2024_operator_scaling import REFERENCE_POWERS, generate, summarize
 from benchmarks.run_li2024_formal_point import load_snapshot, write_snapshot_atomic
 import numpy as np
 
@@ -183,6 +184,105 @@ def test_li2024_plot_guides_match_binary_tree_mathematics():
     assert summary[0]["time_total_mean_sec"] == 5.0
     assert summary[0]["n_repeats"] == 3
     assert summary[0]["contract_primitive"] is True
+
+
+def test_li2024_plot_writes_paired_formal_outputs(tmp_path):
+    rows = []
+    panel_values = {
+        "modes": (4, 8),
+        "state_bond": (4, 8),
+        "primitive_basis": (4, 8),
+    }
+    for panel, values in panel_values.items():
+        for method in FORMAL_METHODS:
+            for value in values:
+                n_modes = value if panel == "modes" else 16
+                state_bond = value if panel == "state_bond" else 20
+                primitive_basis = value if panel == "primitive_basis" else 10
+                rows.append({
+                    "status": "ok",
+                    "case_name": "li2024_spin_boson",
+                    "quantity": "local_effective_1site_apply_all_nodes",
+                    "panel": panel,
+                    "method": method,
+                    "n_modes": n_modes,
+                    "target_state_bond": state_bond,
+                    "primitive_basis_dim": primitive_basis,
+                    "contract_primitive": primitive_basis > state_bond,
+                    "state_max_bond": state_bond,
+                    "phonon_tree_layout": "primitive_contracted",
+                    "n_active_nodes": n_modes,
+                    "n_sop_terms": 1 + 3 * n_modes,
+                    "ttno_max_bond": 3,
+                    "state_tensor_elements": 1000,
+                    "operator_tensor_elements": 2000,
+                    "repeat_id": 0,
+                    "time_total_sec": float(value),
+                    "time_env_build_sec": 0.25 * value,
+                    "time_apply_sec": 0.75 * value,
+                    "relative_error_vs_ttno": 0.0,
+                })
+
+    summary, fits, pdf, png = generate(rows, tmp_path / "li2024")
+
+    assert summary
+    assert fits
+    assert pdf.name == "li2024_scaling_three_panel.pdf"
+    assert png.name == "li2024_scaling_three_panel.png"
+    assert pdf.stat().st_size > 0
+    assert png.stat().st_size > 0
+
+
+def test_li2024_finalizer_reports_both_figure_paths(tmp_path, monkeypatch, capsys):
+    snapshot_dir = tmp_path / "snapshots"
+    snapshot_dir.mkdir()
+    row = {
+        "task_id": 0,
+        "status": "ok",
+        "case_name": "li2024_spin_boson",
+        "quantity": "local_effective_1site_apply_all_nodes",
+        "panel": "modes",
+        "method": "ttno_with_env",
+        "n_modes": 4,
+        "target_state_bond": 20,
+        "primitive_basis_dim": 10,
+        "contract_primitive": False,
+        "state_max_bond": 20,
+        "phonon_tree_layout": "paired",
+        "n_active_nodes": 4,
+        "n_sop_terms": 13,
+        "ttno_max_bond": 3,
+        "state_tensor_elements": 1000,
+        "operator_tensor_elements": 2000,
+        "repeat_id": 0,
+        "time_total_sec": 1.0,
+        "time_env_build_sec": 0.25,
+        "time_apply_sec": 0.75,
+        "relative_error_vs_ttno": 0.0,
+    }
+    write_snapshot_atomic(snapshot_dir / "point.npz", row)
+    manifest = tmp_path / "manifest.tsv"
+    manifest.write_text("task_id\n0\n")
+    output_prefix = tmp_path / "li2024"
+    monkeypatch.setattr(sys, "argv", [
+        "finalize_li2024_formal.py",
+        "--manifest",
+        str(manifest),
+        "--snapshot-dir",
+        str(snapshot_dir),
+        "--raw-output",
+        str(tmp_path / "raw.csv"),
+        "--missing-output",
+        str(tmp_path / "missing.json"),
+        "--output-prefix",
+        str(output_prefix),
+    ])
+
+    finalize_main()
+
+    output = capsys.readouterr().out
+    assert "li2024_scaling_three_panel.pdf" in output
+    assert "li2024_scaling_three_panel.png" in output
 
 
 def test_li2024_slurm_wrappers_activate_conda_before_nounset():

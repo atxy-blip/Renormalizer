@@ -73,10 +73,11 @@ def main():
         raise RuntimeError(
             f"refusing to label incomplete result as final: {len(missing)} missing/error tasks"
         )
-    summary, fits, pdf = generate(rows, args.output_prefix)
+    summary, fits, pdf, png = generate(rows, args.output_prefix)
     print(
         f"Collected {len(rows)}/{len(expected)} snapshots; "
-        f"wrote {len(summary)} summary rows, {len(fits)} fits, and {pdf}"
+        f"wrote {len(summary)} summary rows, {len(fits)} fits, "
+        f"and figures {pdf} and {png}"
     )
 
 
