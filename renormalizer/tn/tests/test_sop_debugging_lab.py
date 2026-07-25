@@ -31,4 +31,10 @@ def test_lab_summaries_make_term_and_cache_structure_observable():
     assert strict["key_shape"] == "(source_node_idx, target_node_idx, term_index)"
     assert strict["n_entries"] == 2 * (len(ctx["tree"].node_list) - 1) * ctx["sop"].n_terms
     assert cache_comparison["signature_entries"] <= cache_comparison["term_entries"]
+    assert cache_comparison["signature_metadata"] == {
+        "method": "sop_env_plus_operator_cache",
+        "purpose": "explanatory",
+        "is_optimized": True,
+        "is_strict": False,
+    }
     assert ttno["max_bond"] == max(ctx["ttno"].bond_dims)

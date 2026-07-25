@@ -100,7 +100,11 @@ def summarize_strict_cache(environment):
 
 
 def compare_cache_modes(sop, psi, active_node=None):
-    """Compare flat-term and subtree-signature caches on one active TTNS node."""
+    """Compare a strict term cache with an explanatory optimized signature cache.
+
+    The signature cache is the non-strict ``sop_env_plus_operator_cache``
+    optimization. It is included for explanation only, not as a formal method.
+    """
 
     active_node = active_node or psi.root
     term_cache = SOPOneSiteEffective(sop, psi, active_node)
@@ -115,6 +119,12 @@ def compare_cache_modes(sop, psi, active_node=None):
         "signature_entries": len(signature_keys),
         "term_representative_keys": _builtin(term_keys[:3]),
         "signature_representative_keys": _builtin(signature_keys[:3]),
+        "signature_metadata": {
+            "method": "sop_env_plus_operator_cache",
+            "purpose": "explanatory",
+            "is_optimized": True,
+            "is_strict": False,
+        },
     }
 
 
