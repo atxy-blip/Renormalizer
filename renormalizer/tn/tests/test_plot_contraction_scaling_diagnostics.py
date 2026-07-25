@@ -5,11 +5,18 @@ import pytest
 import renormalizer
 
 from benchmarks.plot_contraction_scaling_diagnostics import (
+    COLORS,
     generate_figures,
     log_fit,
     read_summary,
     select_series,
 )
+
+
+def test_diagnostic_palette_uses_nature_semantics():
+    assert COLORS["sop"] == "#00529B"
+    assert COLORS["ttno"] == "#007A33"
+    assert COLORS["paired"] == "#CC0000"
 
 
 def test_summary_dimensions_are_parsed_and_series_are_sorted_numerically(tmp_path):

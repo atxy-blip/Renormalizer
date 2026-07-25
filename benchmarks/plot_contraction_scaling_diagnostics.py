@@ -11,6 +11,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from benchmarks.nature_plot_style import (
+    finish_axis,
+    label_panel,
+    nature_style,
+    save_pdf_png,
+)
+
 
 INTEGER_FIELDS = {
     "state_bond",
@@ -35,10 +42,10 @@ FIT_FIELDS = (
 )
 
 COLORS = {
-    "sop": "#a23b3b",
-    "ttno": "#356f9f",
-    "paired": "#9b3a3a",
-    "contracted": "#2f7d46",
+    "sop": "#00529B",
+    "ttno": "#007A33",
+    "paired": "#CC0000",
+    "contracted": "#007A33",
     "operator": "#d17a22",
     "environment": "#3575a8",
     "apply": "#7655a8",
@@ -138,14 +145,12 @@ def _plot_metric(
     y = np.asarray([float(row[y_field]) for row in rows])
     std = np.asarray([float(row.get(std_field, 0.0)) for row in rows])
     tail_fit = _record_fits(records, figure, panel, kernel, metric, x_field, rows)
-    plotted_label = rf"{label} ($\alpha_{{\rm tail}}={tail_fit['alpha']:.2f}$)"
+    plotted_label = label + rf" ($\alpha_{{tail}}={tail_fit['alpha']:.2f}$)"
     ax.plot(
         x,
         y,
         color=color,
         marker=marker,
-        markersize=4.5,
-        linewidth=1.7,
         linestyle=linestyle,
         label=plotted_label,
     )
@@ -159,7 +164,7 @@ def _reference_line(ax, x, y, power, label, color="#555555", position=0.92):
     count = min(4, len(x))
     ref_x = np.asarray(x[-count:], dtype=float)
     ref_y = float(y[-1]) * (ref_x / ref_x[-1]) ** power
-    ax.plot(ref_x, ref_y, color=color, linestyle="--", linewidth=1.2, alpha=0.75)
+    ax.plot(ref_x, ref_y, color=color, linestyle="--", alpha=0.75)
     index = 0 if count < 3 else 1
     ax.annotate(
         label,
@@ -172,147 +177,200 @@ def _reference_line(ax, x, y, power, label, color="#555555", position=0.92):
     )
 
 
-def _finish_axis(ax, xlabel, ylabel, title):
+def _finish_axis(ax, xlabel, ylabel, panel_label, title):
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.set_title(title, loc="left", fontsize=10)
-    ax.grid(True, which="major", color="#d5d5d5", linewidth=0.6, alpha=0.7)
-    ax.grid(True, which="minor", color="#eeeeee", linewidth=0.35, alpha=0.5)
-    ax.legend(frameon=False, fontsize=7.6, handlelength=2.2)
+    label_panel(ax, panel_label, title)
+    finish_axis(ax)
+    ax.legend(
+        loc="upper left",
+        frameon=False,
+        handlelength=1.6,
+        handletextpad=0.5,
+        labelspacing=0.3,
+        borderaxespad=0.4,
+    )
 
 
 def _plot_complexity_validation(rows, records, output_dir):
     figure_name = "complexity_validation"
-    fig, axes = plt.subplots(2, 2, figsize=(10.2, 7.6), constrained_layout=True)
+    with nature_style():
+        fig, axes = plt.subplots(2, 2, figsize=(7.0, 5.4))
+        fig.subplots_adjust(
+            left=0.11,
+            right=0.985,
+            bottom=0.10,
+            top=0.96,
+            wspace=0.28,
+            hspace=0.34,
+        )
 
-    internal = (
-        ("sop_internal", "SOP internal", COLORS["sop"], "o"),
-        ("ttno_internal", "TTNO internal", COLORS["ttno"], "s"),
-    )
-    internal_values = {}
-    for kernel, label, color, marker in internal:
-        series = select_series(rows, "internal_ms", kernel, "state_bond")
-        internal_values[kernel] = _plot_metric(
-            axes[0, 0], records, figure_name, "internal_ms", kernel,
-            series, "state_bond", "optimized_flops", label, color, marker,
+        internal = (
+            ("sop_internal", "SOP internal", COLORS["sop"], "o"),
+            ("ttno_internal", "TTNO internal", COLORS["ttno"], "s"),
         )
-        _plot_metric(
-            axes[0, 1], records, figure_name, "internal_ms", kernel,
-            series, "state_bond", "apply_sec", label, color, marker,
+        internal_values = {}
+        for kernel, label, color, marker in internal:
+            series = select_series(rows, "internal_ms", kernel, "state_bond")
+            internal_values[kernel] = _plot_metric(
+                axes[0, 0], records, figure_name, "internal_ms", kernel,
+                series, "state_bond", "optimized_flops", label, color, marker,
+            )
+            _plot_metric(
+                axes[0, 1], records, figure_name, "internal_ms", kernel,
+                series, "state_bond", "apply_sec", label, color, marker,
+            )
+        _reference_line(
+            axes[0, 0], *internal_values["sop_internal"], 4,
+            r"$M_s^4$", color=COLORS["sop"],
         )
-    _reference_line(
-        axes[0, 0], *internal_values["sop_internal"], 4,
-        r"$M_s^4$", color=COLORS["sop"],
-    )
-    _finish_axis(
-        axes[0, 0], r"State bond dimension $M_s$", "Optimized FLOPs",
-        r"(a) Internal-node mathematical cost",
-    )
-    _finish_axis(
-        axes[0, 1], r"State bond dimension $M_s$", "Dense-kernel apply time (s)",
-        r"(b) Internal-node wall time",
-    )
+        _finish_axis(
+            axes[0, 0], r"State bond dimension $M_s$", "Optimized FLOPs",
+            "a", "Internal-node mathematical cost",
+        )
+        _finish_axis(
+            axes[0, 1], r"State bond dimension $M_s$",
+            "Dense-kernel apply time (s)", "b", "Internal-node wall time",
+        )
 
-    leaves = (
-        ("ttno_leaf_paired", "Paired leaf", COLORS["paired"], "o", 4, r"$d^4$"),
-        ("ttno_leaf_contracted", "Contracted leaf", COLORS["contracted"], "s", 2, r"$d^2$"),
-    )
-    for kernel, label, color, marker, power, guide in leaves:
-        series = select_series(rows, "leaf_d", kernel, "primitive_basis")
-        x, y = _plot_metric(
-            axes[1, 0], records, figure_name, "leaf_d", kernel,
-            series, "primitive_basis", "optimized_flops", label, color, marker,
+        leaves = (
+            (
+                "ttno_leaf_paired",
+                "Paired leaf",
+                COLORS["paired"],
+                "o",
+                4,
+                r"$d^4$",
+            ),
+            (
+                "ttno_leaf_contracted",
+                "Contracted leaf",
+                COLORS["contracted"],
+                "s",
+                2,
+                r"$d^2$",
+            ),
         )
-        _reference_line(axes[1, 0], x, y, power, guide, color=color)
-        _plot_metric(
-            axes[1, 1], records, figure_name, "leaf_d", kernel,
-            series, "primitive_basis", "apply_sec", label, color, marker,
+        for kernel, label, color, marker, power, guide in leaves:
+            series = select_series(rows, "leaf_d", kernel, "primitive_basis")
+            x, y = _plot_metric(
+                axes[1, 0], records, figure_name, "leaf_d", kernel,
+                series, "primitive_basis", "optimized_flops", label, color,
+                marker,
+            )
+            _reference_line(axes[1, 0], x, y, power, guide, color=color)
+            _plot_metric(
+                axes[1, 1], records, figure_name, "leaf_d", kernel,
+                series, "primitive_basis", "apply_sec", label, color, marker,
+            )
+        _finish_axis(
+            axes[1, 0], r"Primitive basis dimension $d$", "Optimized FLOPs",
+            "c", "Leaf mathematical cost",
         )
-    _finish_axis(
-        axes[1, 0], r"Primitive basis dimension $d$", "Optimized FLOPs",
-        r"(c) Leaf mathematical cost",
-    )
-    _finish_axis(
-        axes[1, 1], r"Primitive basis dimension $d$", "Dense-kernel apply time (s)",
-        r"(d) Leaf wall time",
-    )
+        _finish_axis(
+            axes[1, 1], r"Primitive basis dimension $d$",
+            "Dense-kernel apply time (s)", "d", "Leaf wall time",
+        )
 
-    pdf = output_dir / f"{figure_name}.pdf"
-    png = output_dir / f"{figure_name}.png"
-    fig.savefig(pdf, bbox_inches="tight")
-    fig.savefig(png, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+        pdf, png = save_pdf_png(fig, output_dir / f"{figure_name}.pdf")
+        plt.close(fig)
     return pdf, png
 
 
 def _plot_model_mechanism(rows, records, output_dir):
     figure_name = "model_mechanism"
-    fig, axes = plt.subplots(2, 2, figsize=(10.2, 7.6), constrained_layout=True)
-    models = (
-        ("ttno_model_paired", "Paired tree", COLORS["paired"], "o"),
-        ("ttno_model_contracted", "Contracted tree", COLORS["contracted"], "s"),
-    )
+    with nature_style():
+        fig, axes = plt.subplots(2, 2, figsize=(7.0, 5.4))
+        fig.subplots_adjust(
+            left=0.11,
+            right=0.985,
+            bottom=0.10,
+            top=0.96,
+            wspace=0.28,
+            hspace=0.34,
+        )
 
-    model_rows = {}
-    for kernel, label, color, marker in models:
-        series = select_series(rows, "model_d", kernel, "primitive_basis")
-        model_rows[kernel] = series
-        _plot_metric(
-            axes[0, 0], records, figure_name, "model_d", kernel,
-            series, "primitive_basis", "time_total_sec", label, color, marker,
+        models = (
+            ("ttno_model_paired", "Paired tree", COLORS["paired"], "o"),
+            (
+                "ttno_model_contracted",
+                "Contracted tree",
+                COLORS["contracted"],
+                "s",
+            ),
         )
-    _finish_axis(
-        axes[0, 0], r"Primitive basis dimension $d$", "Measured workflow time (s)",
-        r"(a) Full-model total time",
-    )
 
-    paired = model_rows["ttno_model_paired"]
-    for metric, label, color, marker in (
-        ("operator_build_sec", "TTNO construction", COLORS["operator"], "o"),
-        ("environment_build_sec", "Environment construction", COLORS["environment"], "s"),
-        ("apply_sec", "Local actions", COLORS["apply"], "^"),
-    ):
-        _plot_metric(
-            axes[0, 1], records, figure_name, "model_d", "ttno_model_paired",
-            paired, "primitive_basis", metric, label, color, marker,
+        model_rows = {}
+        for kernel, label, color, marker in models:
+            series = select_series(rows, "model_d", kernel, "primitive_basis")
+            model_rows[kernel] = series
+            _plot_metric(
+                axes[0, 0], records, figure_name, "model_d", kernel,
+                series, "primitive_basis", "time_total_sec", label, color,
+                marker,
+            )
+        _finish_axis(
+            axes[0, 0], r"Primitive basis dimension $d$",
+            "Measured workflow time (s)", "a", "Full-model total time",
         )
-    _finish_axis(
-        axes[0, 1], r"Primitive basis dimension $d$", "Measured time (s)",
-        r"(b) Paired-tree time decomposition",
-    )
 
-    for kernel, label, color, marker in models:
-        series = model_rows[kernel]
-        _plot_metric(
-            axes[1, 0], records, figure_name, "model_d", kernel,
-            series, "primitive_basis", "operator_tensor_elements",
-            f"{label} TTNO", color, marker,
+        paired = model_rows["ttno_model_paired"]
+        for metric, label, color, marker in (
+            (
+                "operator_build_sec",
+                "TTNO construction",
+                COLORS["operator"],
+                "o",
+            ),
+            (
+                "environment_build_sec",
+                "Environment construction",
+                COLORS["environment"],
+                "s",
+            ),
+            ("apply_sec", "Local actions", COLORS["apply"], "^"),
+        ):
+            _plot_metric(
+                axes[0, 1], records, figure_name, "model_d",
+                "ttno_model_paired", paired, "primitive_basis", metric, label,
+                color, marker,
+            )
+        _finish_axis(
+            axes[0, 1], r"Primitive basis dimension $d$", "Measured time (s)",
+            "b", "Paired-tree time decomposition",
         )
-        _plot_metric(
-            axes[1, 0], records, figure_name, "model_d", kernel,
-            series, "primitive_basis", "state_tensor_elements",
-            f"{label} TTNS", color, marker, linestyle=":",
-        )
-        _plot_metric(
-            axes[1, 1], records, figure_name, "model_d", kernel,
-            series, "primitive_basis", "peak_memory_mb", label, color, marker,
-        )
-    _finish_axis(
-        axes[1, 0], r"Primitive basis dimension $d$", "Stored tensor elements",
-        r"(c) State and operator storage",
-    )
-    _finish_axis(
-        axes[1, 1], r"Primitive basis dimension $d$", "Peak resident memory (MB)",
-        r"(d) Process memory",
-    )
 
-    pdf = output_dir / f"{figure_name}.pdf"
-    png = output_dir / f"{figure_name}.png"
-    fig.savefig(pdf, bbox_inches="tight")
-    fig.savefig(png, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+        for kernel, label, color, marker in models:
+            series = model_rows[kernel]
+            storage_label = label.removesuffix(" tree")
+            _plot_metric(
+                axes[1, 0], records, figure_name, "model_d", kernel,
+                series, "primitive_basis", "operator_tensor_elements",
+                f"{storage_label} TTNO", color, marker,
+            )
+            _plot_metric(
+                axes[1, 0], records, figure_name, "model_d", kernel,
+                series, "primitive_basis", "state_tensor_elements",
+                f"{storage_label} TTNS", color, marker, linestyle=":",
+            )
+            _plot_metric(
+                axes[1, 1], records, figure_name, "model_d", kernel,
+                series, "primitive_basis", "peak_memory_mb", label, color,
+                marker,
+            )
+        _finish_axis(
+            axes[1, 0], r"Primitive basis dimension $d$",
+            "Stored tensor elements", "c", "State and operator storage",
+        )
+        _finish_axis(
+            axes[1, 1], r"Primitive basis dimension $d$",
+            "Peak resident memory (MB)", "d", "Process memory",
+        )
+
+        pdf, png = save_pdf_png(fig, output_dir / f"{figure_name}.pdf")
+        plt.close(fig)
     return pdf, png
 
 
