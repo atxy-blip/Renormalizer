@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from benchmarks.sop_debugging_lab import (
     build_lab_case,
     compare_cache_modes,
@@ -6,6 +9,12 @@ from benchmarks.sop_debugging_lab import (
     summarize_tree_local_ops,
     summarize_ttno,
 )
+
+NOTEBOOK = Path("notebooks/sop_debugging_lab.ipynb")
+
+
+def _load_notebook():
+    return json.loads(NOTEBOOK.read_text())
 
 
 def test_lab_case_exposes_real_small_li2024_objects():
@@ -38,3 +47,41 @@ def test_lab_summaries_make_term_and_cache_structure_observable():
         "is_strict": False,
     }
     assert ttno["max_bond"] == max(ctx["ttno"].bond_dims)
+
+
+def test_notebook_contains_all_investigations_formulas_and_recap():
+    notebook = _load_notebook()
+    assert notebook["metadata"]["kernelspec"]["name"] == "reno-3.9"
+    markdown = "\n".join(
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "markdown"
+    )
+    for number in range(1, 11):
+        assert f"Investigation {number}" in markdown
+    assert r"H = \\sum_l c_l" in markdown
+    assert r"E_{l,u\\rightarrow v}" in markdown
+    assert "What changed / Why / Effect" in markdown
+    assert "local_effective_1site_apply_all_nodes" in markdown
+    assert "signature_metadata" in markdown
+    for section in (
+        "Supervisor question",
+        "Formula",
+        "Runnable observation",
+        "Exact breakpoint",
+        "Inspect",
+        "Answer prompt",
+        "Expected observation",
+        "Three-sentence oral explanation",
+    ):
+        assert markdown.count(section) >= 10
+
+
+def test_notebook_code_cells_execute_with_breakpoints_disabled():
+    notebook = _load_notebook()
+    namespace = {"__name__": "__sop_lab_test__"}
+    for cell in notebook["cells"]:
+        if cell["cell_type"] == "code":
+            exec(compile("".join(cell["source"]), str(NOTEBOOK), "exec"), namespace)
+    assert namespace["RUN_BREAKPOINTS"] is False
+    assert namespace["LAB_COMPLETE"] is True
