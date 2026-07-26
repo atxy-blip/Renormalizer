@@ -86,15 +86,12 @@ and PNG; do not treat a rerun as permission to change the underlying science.
 
 `benchmarks/plot_operator_env_scaling.py` aggregates the historical strict
 all-node SOP/TTNO comparison into a three-panel figure. It remains the plotter
-for that data group, although its older output is not one of the six
-Nature-style artifacts below.
-
-```bash
-env MPLCONFIGDIR=/tmp/matplotlib-operator-env \
-conda run -n reno-3.9 python -m benchmarks.plot_operator_env_scaling \
-  --raw benchmarks/results/operator_env_scaling/final/strict_all_nodes_medium_114336_raw.csv \
-  --output-prefix benchmarks/results/operator_env_scaling/final/strict_all_nodes_medium_114336
-```
+for that data group, but the required historical input
+`benchmarks/results/operator_env_scaling/final/strict_all_nodes_medium_114336_raw.csv`
+is not tracked and is absent from this checkout. Therefore the historical
+strict-all-node figure is currently not reproducible from repository contents,
+and no runnable regeneration command is provided here. Its older output is not
+one of the six tracked Nature-style artifacts below.
 
 ### Li.W.2024 formal three-panel figure
 
