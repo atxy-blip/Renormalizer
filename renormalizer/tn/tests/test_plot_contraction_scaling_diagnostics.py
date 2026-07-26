@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 import renormalizer
+import benchmarks.plot_contraction_scaling_diagnostics as diagnostics
 
 from benchmarks.plot_contraction_scaling_diagnostics import (
     COLORS,
@@ -122,6 +123,26 @@ def _synthetic_summary_rows():
                 "peak_memory_mb_std": 1,
             })
     return rows
+
+
+def test_process_memory_legend_has_a_clear_left_axis_inset(monkeypatch, tmp_path):
+    captured_figures = []
+
+    def capture_figure(fig, pdf_path):
+        fig.canvas.draw()
+        captured_figures.append(fig)
+        return Path(pdf_path), Path(pdf_path).with_suffix(".png")
+
+    monkeypatch.setattr(diagnostics, "save_pdf_png", capture_figure)
+    diagnostics._plot_model_mechanism(_synthetic_summary_rows(), [], tmp_path)
+
+    figure = captured_figures[0]
+    axis = figure.axes[3]
+    renderer = figure.canvas.get_renderer()
+    legend_left = axis.get_legend().get_window_extent(renderer).x0
+    axis_bounds = axis.get_window_extent(renderer)
+
+    assert legend_left >= axis_bounds.x0 + 0.03 * axis_bounds.width
 
 
 def test_generate_figures_writes_declared_artifacts(tmp_path):

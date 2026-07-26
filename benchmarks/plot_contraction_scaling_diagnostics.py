@@ -177,14 +177,22 @@ def _reference_line(ax, x, y, power, label, color="#555555", position=0.92):
     )
 
 
-def _finish_axis(ax, xlabel, ylabel, panel_label, title):
+def _finish_axis(
+    ax,
+    xlabel,
+    ylabel,
+    panel_label,
+    title,
+    *,
+    legend_bbox_to_anchor=None,
+):
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     label_panel(ax, panel_label, title)
     finish_axis(ax)
-    ax.legend(
+    legend_kwargs = dict(
         loc="upper left",
         frameon=False,
         handlelength=1.6,
@@ -192,6 +200,9 @@ def _finish_axis(ax, xlabel, ylabel, panel_label, title):
         labelspacing=0.3,
         borderaxespad=0.4,
     )
+    if legend_bbox_to_anchor is not None:
+        legend_kwargs["bbox_to_anchor"] = legend_bbox_to_anchor
+    ax.legend(**legend_kwargs)
 
 
 def _plot_complexity_validation(rows, records, output_dir):
@@ -367,6 +378,7 @@ def _plot_model_mechanism(rows, records, output_dir):
         _finish_axis(
             axes[1, 1], r"Primitive basis dimension $d$",
             "Peak resident memory (MB)", "d", "Process memory",
+            legend_bbox_to_anchor=(0.04, 1.0),
         )
 
         pdf, png = save_pdf_png(fig, output_dir / f"{figure_name}.pdf")
