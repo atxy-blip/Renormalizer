@@ -6,11 +6,25 @@ Li.W.2024 spin--boson case，把 symbolic `Op`、flat SOP、strict state environ
 
 ## 启动与断点
 
-从仓库根目录启动：
+本机的 `reno-3.9` 环境提供实验所需的 Python、IPython 和 `ipykernel`，但不提供
+`jupyter-lab` server；`base` 环境提供 JupyterLab。第一次运行时先把现有
+`reno-3.9` Python 注册成 user kernelspec（只写本地配置，不下载或安装 package）：
 
 ```bash
-conda run -n reno-3.9 jupyter lab notebooks/sop_debugging_lab.ipynb
+conda run -n reno-3.9 python -m ipykernel install \
+  --user --name reno-3.9 --display-name "Python (reno-3.9)"
 ```
+
+之后从仓库根目录用 `base` 的 server 启动 notebook：
+
+```bash
+conda run -n base jupyter lab notebooks/sop_debugging_lab.ipynb
+```
+
+notebook metadata 中的 kernel name 是 `reno-3.9`，因此 server 会选择刚注册的
+`Python (reno-3.9)`，实际执行仍使用 `reno-3.9/bin/python`。setup cell 会从仓库
+根目录或 `notebooks/` kernel working directory 向上发现 repository root，再把
+in-tree `benchmarks` 和 `renormalizer` package 加入 import path。
 
 默认保持 `RUN_BREAKPOINTS=False`，这样可从头到尾不间断地执行 notebook。只有在
 某个 investigation 明确标出的 production cell 已经需要调试时，才设为 `RUN_BREAKPOINTS=True`；不要把
