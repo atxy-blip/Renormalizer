@@ -26,6 +26,8 @@
 ## 操作指南
 
 - `llmdoc/guides/sop-environment-benchmark-flow.md`：实现三条 benchmark path 的建议流程。
+- `llmdoc/guides/sop-debugging-lab.md`：执行十项 SOP debugging lab，并保持 formal
+  timing object、method identity 和 scaling 结论的科学边界。
 
 ## 参考索引
 

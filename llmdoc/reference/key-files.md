@@ -55,6 +55,14 @@
 
 ## Benchmark / tests
 
+- `notebooks/sop_debugging_lab.ipynb`
+  - 十项可执行 SOP debugging investigations、breakpoint policy、formal timing
+    boundary 和 supervisor-facing recap。
+
+- `benchmarks/sop_debugging_lab.py`
+  - `build_lab_case()` 及六个 notebook-friendly helpers；只暴露生产对象的稳定摘要，
+    不重实现 benchmark algorithm。
+
 - `benchmarks/benchmark_adaptive_operator_env.py`
   - `SOPOneSiteEffective`：one-site branch environment，可选 operator signature cache。
   - `SOPMCTDHSweepEnvironment`：strict per-term directed-edge state environment。
