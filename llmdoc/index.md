@@ -32,6 +32,8 @@
 ## 参考索引
 
 - `llmdoc/reference/key-files.md`：核心文件、类、函数索引。
+- `llmdoc/reference/plotting-style-guide.md`：formal benchmark figure 的共享
+  Nature-style typography、语义编码、固定版式、导出策略与复现命令。
 
 ## 记忆区
 

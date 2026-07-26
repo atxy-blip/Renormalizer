@@ -59,6 +59,17 @@ internal-node wall time 在测试区间内小于四次方，但 largest-four-poi
 全区间的约 2.90/3.18 上升到约 3.63/3.81。数学 FLOP 次数与有限尺寸 wall-time
 指数必须分开报告。
 
+Nature-style artifact pair（每张固定版式图均同时保存 transparent PDF 和
+300-dpi PNG）：
+
+```text
+benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/
+  complexity_validation.pdf
+  complexity_validation.png
+  model_mechanism.pdf
+  model_mechanism.png
+```
+
 ## Li.W.2024 spin-boson rerun
 
 结果目录：
@@ -93,6 +104,18 @@ largest-four-point wall-time fit：
 `d > M_s` 时启用 primitive contraction，大 `d` 区间的 whole-model wall time
 因此近似常数；这不表示 leaf contraction 是 `O(1)`，其 isolated FLOPs 和 storage
 仍趋向 `d^2`。
+
+对应 Nature-style three-panel artifact：
+
+```text
+benchmarks/results/operator_env_scaling/final/
+  li2024_spin_boson_20260713_scaling_three_panel.pdf
+  li2024_spin_boson_20260713_scaling_three_panel.png
+```
+
+这些六个 artifact 只更新 typography、semantic color/marker、fixed margins 和
+PDF/PNG export；不改变上述 fits、`quantity` 或科学解释边界。完整样式和复现命令见
+`llmdoc/reference/plotting-style-guide.md`。
 
 ## 科学表述边界
 

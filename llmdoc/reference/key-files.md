@@ -63,6 +63,14 @@
   - `build_lab_case()` 及六个 notebook-friendly helpers；只暴露生产对象的稳定摘要，
     不重实现 benchmark algorithm。
 
+- `benchmarks/nature_plot_style.py`
+  - `NATURE_RCPARAMS`：scoped Nature-style typography、inward ticks 与 Type 42
+    PDF font policy。
+  - `METHOD_STYLES`：`sop_no_env`、strict MCTDH-like SOP、TTNO-with-env 的
+    stable color/marker encoding。
+  - `nature_style()`、`finish_axis()`、`label_panel()`、`save_pdf_png()`：共享
+    rc context、axis treatment、panel label 和 fixed-boundary dual export。
+
 - `benchmarks/benchmark_adaptive_operator_env.py`
   - `SOPOneSiteEffective`：one-site branch environment，可选 operator signature cache。
   - `SOPMCTDHSweepEnvironment`：strict per-term directed-edge state environment。
@@ -84,7 +92,8 @@
   - 检查 189 个 task IDs，只有全部 `status=ok` 时才生成 final aggregate 和 PDF。
 
 - `benchmarks/plot_li2024_operator_scaling.py`
-  - 聚合 repeat，拟合 all/largest-four 窗口，绘制三 panel PDF。
+  - 聚合 Li.W.2024 repeats，拟合 all/largest-four 窗口，绘制 Nature-style
+    three-panel PDF/PNG。
 
 - `benchmarks/contraction_scaling_diagnostics.py`
   - 定义 internal-`M_s`、leaf-`d` 和 full-model-`d` 六类 controls。
@@ -97,7 +106,8 @@
   - 按 repeats 取 median/std，并生成 all/largest-four scaling fits。
 
 - `benchmarks/plot_contraction_scaling_diagnostics.py`
-  - 生成 complexity validation 和 full-model mechanism 两组图。
+  - 生成 Nature-style `complexity_validation` 和 `model_mechanism` 两组
+    two-by-two PDF/PNG diagnostics。
 
 - `benchmarks/ren_formal_manifest.py`
   - 定义 Ren-style Tree benchmark 的 `N_site/M_s/d` 参数和 216 个 array tasks。
@@ -109,7 +119,8 @@
   - Curie CPU 正式三变量 array job wrapper。
 
 - `benchmarks/plot_operator_env_scaling.py`
-  - 聚合 raw rows，绘制三方法三 panel PDF；固定参考线不进入 legend。
+  - 聚合 strict all-node raw rows，绘制三方法 Nature-style three-panel
+    PDF/PNG；固定参考线不进入 legend。
 
 - `renormalizer/tn/tests/test_adaptive_operator_env_benchmark.py`
   - strict message cache、方法选择和 benchmark 字段测试。
