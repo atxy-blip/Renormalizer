@@ -59,8 +59,9 @@ def test_notebook_contains_all_investigations_formulas_and_recap():
     )
     for number in range(1, 11):
         assert f"Investigation {number}" in markdown
-    assert r"H = \\sum_l c_l" in markdown
-    assert r"E_{l,u\\rightarrow v}" in markdown
+    assert "# Investigation 1 — End-to-End Experiment Map" in markdown
+    assert r"H = \sum_l c_l" in markdown
+    assert r"E_{l,u\rightarrow v}" in markdown
     assert "What changed / Why / Effect" in markdown
     assert "local_effective_1site_apply_all_nodes" in markdown
     assert "signature_metadata" in markdown
@@ -77,7 +78,7 @@ def test_notebook_contains_all_investigations_formulas_and_recap():
         assert markdown.count(section) >= 10
 
 
-def test_notebook_code_cells_execute_with_breakpoints_disabled():
+def test_notebook_code_cells_execute_with_breakpoints_disabled(capsys):
     notebook = _load_notebook()
     namespace = {"__name__": "__sop_lab_test__"}
     for cell in notebook["cells"]:
@@ -85,3 +86,7 @@ def test_notebook_code_cells_execute_with_breakpoints_disabled():
             exec(compile("".join(cell["source"]), str(NOTEBOOK), "exec"), namespace)
     assert namespace["RUN_BREAKPOINTS"] is False
     assert namespace["LAB_COMPLETE"] is True
+    output = capsys.readouterr().out
+    assert "resolved op_mat: BasisSHO.op_mat" in output
+    assert "op_mat return: renormalizer/model/basis.py:394" in output
+    assert "plot: benchmarks.plot_li2024_operator_scaling.plot" in output
