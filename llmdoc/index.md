@@ -28,6 +28,8 @@
 - `llmdoc/guides/sop-environment-benchmark-flow.md`：实现三条 benchmark path 的建议流程。
 - `llmdoc/guides/sop-debugging-lab.md`：执行十项 SOP debugging lab，并保持 formal
   timing object、method identity 和 scaling 结论的科学边界。
+- `llmdoc/guides/sop-linear-learning-checklist.md`：按 12 个 45 分钟 Session
+  线性完成 notebook 调试、实验数据链、论文图阅读和老师汇报演练。
 
 ## 参考索引
 

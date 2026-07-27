@@ -59,6 +59,10 @@
   - 十项可执行 SOP debugging investigations、breakpoint policy、formal timing
     boundary 和 supervisor-facing recap。
 
+- `llmdoc/guides/sop-linear-learning-checklist.md`
+  - 12 个 45 分钟、严格顺序且以实际证据为完成条件的 SOP 学习路线；覆盖 notebook、
+    formal manifest-to-figure 数据链、主文/SI 图件和口述自检。
+
 - `benchmarks/sop_debugging_lab.py`
   - `build_lab_case()` 及六个 notebook-friendly helpers；只暴露生产对象的稳定摘要，
     不重实现 benchmark algorithm。
