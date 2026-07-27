@@ -108,4 +108,3 @@ PNG 是版式检查和预览副本；投稿使用对应 PDF。旧 `ren_formal_pa
 - 明确区分 finite-window wall-time exponent 与 tensor FLOP complexity；
 - 主文/SI 图件路径可以直接点击；
 - 学习者完成最后一节后可按“修改—原因—效果—证据—边界”顺序口述。
-

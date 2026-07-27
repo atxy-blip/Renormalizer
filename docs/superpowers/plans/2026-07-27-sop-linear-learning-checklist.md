@@ -214,4 +214,3 @@ git status --short
 ```
 
 Expected: all checks pass and the working tree is clean.
-
