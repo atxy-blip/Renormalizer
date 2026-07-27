@@ -3,8 +3,8 @@
 这是一条从“能运行”到“能给老师讲明白”的单线路线。唯一主教材是
 [`notebooks/sop_debugging_lab.ipynb`](../../notebooks/sop_debugging_lab.ipynb)。
 
-当前 Session：`____ / 12`  
-上次停止位置：`________________`  
+当前 Session：`____ / 12`<br>
+上次停止位置：`________________`<br>
 今天只做一个 Session：`是 / 否`
 
 ## 使用规则
@@ -846,4 +846,3 @@ full-workflow wall time 与 isolated FLOP complexity 必须分开。
 主文放 Li.W.2024 three-panel scaling；
 SI 放 complexity validation 和 model mechanism。
 ```
-
