@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Plot the Li.W.2024 spin--boson setup for the three operator kernels."""
+"""Plot the Li.W.2024 spin--boson setup for the three operator kernels.
+
+Figure modes (2026-08-06):
+- main: only the modes panel reports scaling exponents (N_b^3 / N_b^2 / N_b);
+  the state-bond and primitive-basis panels are parameter robustness checks
+  (no exponent fits, no power-law guides) with the adaptive topology switch
+  (paired <-> contracted) marked by a vertical line.
+- si: all three panels keep their largest-four fits and power-law guides
+  (M_s^4 for state bond, constant for large d) for reviewers.
+"""
 
 import argparse
 import csv
@@ -35,12 +44,13 @@ METHOD_COLORS = {
     method: METHOD_STYLES[method]["color"]
     for method in FORMAL_METHODS
 }
-REFERENCE_POWERS = {
-    "modes": {
-        "sop_no_env": 3.0,
-        "sop_mctdh_like_state_env": 2.0,
-        "ttno_with_env": 1.0,
-    },
+MODE_REFERENCE_POWERS = {
+    "sop_no_env": 3.0,
+    "sop_mctdh_like_state_env": 2.0,
+    "ttno_with_env": 1.0,
+}
+
+PARAMETER_REFERENCE_POWERS = {
     "state_bond": {method: 4.0 for method in FORMAL_METHODS},
     "primitive_basis": {method: 0.0 for method in FORMAL_METHODS},
 }
@@ -60,6 +70,12 @@ PANELS = (
     Panel("state_bond", "target_state_bond", r"State bond dimension, $M_s$", "State bond", "M_s"),
     Panel("primitive_basis", "primitive_basis_dim", r"Primitive basis, $d$", "Primitive basis", "d"),
 )
+FIT_PANELS_MAIN = (PANELS[0],)
+FIT_PANELS_SI = PANELS
+TOPO_SWITCH_X = {
+    "state_bond": 10.0,
+    "primitive_basis": 20.0,
+}
 
 
 def read_raw(path):
@@ -129,9 +145,9 @@ def _fit(points, x_field):
     return float(alpha), float(intercept), 1.0 if total == 0 else 1.0 - residual / total
 
 
-def compute_fits(summary):
+def compute_fits(summary, panels=FIT_PANELS_MAIN):
     fits = []
-    for panel in PANELS:
+    for panel in panels:
         for method in FORMAL_METHODS:
             points = sorted(
                 (
@@ -182,7 +198,9 @@ def _guide_label(symbol, power):
     return rf"$\propto {symbol}^{int(power)}$"
 
 
-def plot(summary, output_prefix):
+def plot(summary, pdf_path, figure_mode="main"):
+    if figure_mode not in ("main", "si"):
+        raise ValueError(f"unsupported figure_mode: {figure_mode!r}")
     with nature_style():
         fig, axes = plt.subplots(1, 3, figsize=(10.5, 2.8), sharey=True)
         fig.subplots_adjust(
@@ -218,21 +236,53 @@ def plot(summary, output_prefix):
                     **style,
                 )
 
-                power = REFERENCE_POWERS[panel.name][method]
-                ref_x = x if panel.name == "modes" else x[len(x) // 2 :]
-                ref_y = y[-1] * (ref_x / ref_x[-1]) ** power
-                ax.plot(ref_x, ref_y, linestyle="--", color=color, alpha=0.7)
-                ax.text(
-                    0.97,
-                    ref_y[-1],
-                    _guide_label(panel.symbol, power),
-                    transform=ax.get_yaxis_transform(),
-                    color=color,
-                    ha="right",
-                    va="center",
-                    clip_on=True,
-                )
+                if panel.name == "modes":
+                    power = MODE_REFERENCE_POWERS[method]
+                    ref_x = x
+                    ref_y = y[-1] * (ref_x / ref_x[-1]) ** power
+                    ax.plot(ref_x, ref_y, linestyle="--", color=color, alpha=0.7)
+                    ax.text(
+                        0.97,
+                        ref_y[-1],
+                        _guide_label(panel.symbol, power),
+                        transform=ax.get_yaxis_transform(),
+                        color=color,
+                        ha="right",
+                        va="center",
+                        clip_on=True,
+                    )
+                elif figure_mode == "si":
+                    power = PARAMETER_REFERENCE_POWERS[panel.name][method]
+                    ref_x = x[len(x) // 2 :]
+                    ref_y = y[-1] * (ref_x / ref_x[-1]) ** power
+                    ax.plot(ref_x, ref_y, linestyle="--", color=color, alpha=0.7)
+                    ax.text(
+                        0.97,
+                        ref_y[-1],
+                        _guide_label(panel.symbol, power),
+                        transform=ax.get_yaxis_transform(),
+                        color=color,
+                        ha="right",
+                        va="center",
+                        clip_on=True,
+                    )
                 all_x.extend(x.tolist())
+
+            if figure_mode == "main":
+                switch_x = TOPO_SWITCH_X.get(panel.name)
+                if switch_x is not None:
+                    ax.axvline(switch_x, color="0.45", linestyle=":", linewidth=1.0)
+                    ax.text(
+                        switch_x,
+                        0.5,
+                        "contracted | paired" if panel.name == "state_bond" else "paired | contracted",
+                        transform=ax.get_yaxis_transform(),
+                        rotation=90,
+                        ha="right",
+                        va="center",
+                        fontsize=6,
+                        color="0.35",
+                    )
 
             ax.set_xscale("log", base=2)
             ax.set_yscale("log")
@@ -245,15 +295,14 @@ def plot(summary, output_prefix):
 
         axes[0].set_ylabel("All-node local-action wall time (s)")
         axes[0].legend(loc="upper left", frameon=False)
-        pdf_path = output_prefix.with_name(
-            output_prefix.name + "_scaling_three_panel.pdf"
-        )
         pdf, png = save_pdf_png(fig, pdf_path)
         plt.close(fig)
     return pdf, png
 
 
-def generate(rows, output_prefix):
+def generate(rows, output_prefix, figure_mode="main"):
+    if figure_mode not in ("main", "si"):
+        raise ValueError(f"unsupported figure_mode: {figure_mode!r}")
     ok_rows = [row for row in rows if row.get("status") == "ok"]
     cases = {row.get("case_name") for row in ok_rows}
     quantities = {row.get("quantity") for row in ok_rows}
@@ -262,10 +311,19 @@ def generate(rows, output_prefix):
     if quantities != {"local_effective_1site_apply_all_nodes"}:
         raise ValueError(f"expected all-node local actions, found {sorted(quantities)}")
     summary = summarize(rows)
-    fits = compute_fits(summary)
-    _write_csv(output_prefix.with_name(output_prefix.name + "_summary.csv"), summary)
-    _write_csv(output_prefix.with_name(output_prefix.name + "_fits.csv"), fits)
-    pdf, png = plot(summary, output_prefix)
+    panels = FIT_PANELS_MAIN if figure_mode == "main" else FIT_PANELS_SI
+    fits = compute_fits(summary, panels=panels)
+    fits_path = output_prefix.with_name(
+        output_prefix.name + ("_fits.csv" if figure_mode == "main" else "_si_fits.csv")
+    )
+    _write_csv(fits_path, fits)
+    if figure_mode == "main":
+        _write_csv(output_prefix.with_name(output_prefix.name + "_summary.csv"), summary)
+    pdf_path = output_prefix.with_name(
+        output_prefix.name
+        + ("_scaling_three_panel.pdf" if figure_mode == "main" else "_si_scaling_three_panel.pdf")
+    )
+    pdf, png = plot(summary, pdf_path, figure_mode=figure_mode)
     return summary, fits, pdf, png
 
 
