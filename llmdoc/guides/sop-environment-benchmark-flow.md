@@ -616,6 +616,21 @@ sbatch benchmarks/scripts/curie_cpu_li2024_formal_finalize.sbatch
 switch 的全区间 fit 只描述 end-to-end workflow；解释 large-`d` complexity 时必须
 同时引用 isolated leaf FLOPs 和 TTNO storage。
 
+正文/SI 分工（2026-08-06）：
+
+- 正文三 panel 图只对 `modes` 报 `N_b^3/N_b^2/N_b`；`state_bond` 与
+  `primitive_basis` 只作稳健性检查（不报指数、不画幂次参考线），并标注
+  d > M_s topology switch。
+- SI 图保留全部 panel 的 largest-four fits 与幂次参考线（M_s^4、常数），
+  供审稿人复核；这些是有效 wall-time 指数，不是渐近 FLOP 指数。
+- artifact 再生成用 Slurm finalizer：
+
+```bash
+sbatch benchmarks/scripts/curie_cpu_li2024_formal_finalize.sbatch
+```
+
+不重跑 189 个 snapshot。
+
 ## 风险与 fallback
 
 - 如果通用 tree branch signature 太复杂，先固定 active node 为 junction bridge/root 附近节点。

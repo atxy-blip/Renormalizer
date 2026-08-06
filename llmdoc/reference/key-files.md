@@ -96,8 +96,10 @@
   - 检查 189 个 task IDs，只有全部 `status=ok` 时才生成 final aggregate 和 PDF。
 
 - `benchmarks/plot_li2024_operator_scaling.py`
-  - 聚合 Li.W.2024 repeats，拟合 all/largest-four 窗口，绘制 Nature-style
-    three-panel PDF/PNG。
+  - 聚合 Li.W.2024 repeats；支持 `figure_mode="main"/"si"`：main 只对 modes
+    panel 拟合 largest-four 指数并绘制稳健性面板（标注 topology switch）；
+    si 保留全部 panel 的指数与幂次参考线。finalizer 同时生成两套 PDF/PNG
+    与 fits。
 
 - `benchmarks/contraction_scaling_diagnostics.py`
   - 定义 internal-`M_s`、leaf-`d` 和 full-model-`d` 六类 controls。

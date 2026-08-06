@@ -92,30 +92,53 @@ quantity: local_effective_1site_apply_all_nodes
 `alpha=0.05`, `Delta=1` 和 `SpectralDensityFunction.Wang1` 离散化。
 每个 panel、方法和参数点各有 3 个 repeat。
 
-largest-four-point wall-time fit：
+### 正式解释口径（2026-08-06）
 
-| panel | `sop_no_env` | `sop_mctdh_like_state_env` | `ttno_with_env` |
-| --- | ---: | ---: | ---: |
-| `N_b` | 3.109 | 2.035 | 0.916 |
-| `M_s` | 2.180 | 2.243 | 2.223 |
-| large `d` | -0.004 | 0.002 | 0.024 |
+正文图 `li2024_spin_boson_20260713_scaling_three_panel.{pdf,png}`：
 
-`N_b` panel 支持 all-node kernel 的 `N_b^3/N_b^2/N_b` reuse 结构。
-`d > M_s` 时启用 primitive contraction，大 `d` 区间的 whole-model wall time
-因此近似常数；这不表示 leaf contraction 是 `O(1)`，其 isolated FLOPs 和 storage
-仍趋向 `d^2`。
+- `modes` panel 是唯一报 scaling 指数的面板（largest-four fit）：
 
-对应 Nature-style three-panel artifact：
+| 方法 | N_b exponent |
+| --- | ---: |
+| `sop_no_env` | 3.109 |
+| `sop_mctdh_like_state_env` | 2.035 |
+| `ttno_with_env` | 0.916 |
+
+对应 `N_b^3 / N_b^2 / N_b` 的 state/operator reuse 结构。
+
+- `state_bond` 与 `primitive_basis` panel 只作参数稳健性检查：不报指数、
+  不画幂次参考线；三条方法相对排名在每个参数点稳定（TTNO 最快，strict
+  state env 次之，no env 最慢）；两个 panel 均标注 adaptive topology switch
+  （d > M_s：paired ↔ contracted），跳变来自 leaf 数翻倍与 d^4 → d^2 切换，
+  详见 `llmdoc/architecture/paired-vs-contracted-leaves.md`。
+
+指数与幂次参考线完整保留在 SI：
 
 ```text
 benchmarks/results/operator_env_scaling/final/
-  li2024_spin_boson_20260713_scaling_three_panel.pdf
-  li2024_spin_boson_20260713_scaling_three_panel.png
+  li2024_spin_boson_20260713_si_scaling_three_panel.pdf
+  li2024_spin_boson_20260713_si_scaling_three_panel.png
+  li2024_spin_boson_20260713_si_fits.csv
 ```
 
-这些六个 artifact 只更新 typography、semantic color/marker、fixed margins 和
-PDF/PNG export；不改变上述 fits、`quantity` 或科学解释边界。完整样式和复现命令见
-`llmdoc/reference/plotting-style-guide.md`。
+SI 图中 M_s panel 保留 M_s^4 参考线，大 d panel 保留常数参考线。它们是有效
+wall-time 指数与参考线，不是渐近 FLOP 指数；isolated full-rank internal
+contraction 的 FLOP 仍为精确 M_s^4（见 contraction diagnostics）。
+
+刻意边界：
+
+- 本 benchmark 只测量 `local_effective_1site_apply_all_nodes` kernel，不做
+  完整 TDVP/传播 step 计时；这是有意的窄口径对比，不是缺口。
+- 不扩大 M_s 区间；不做 M_s 时间占比/throughput 分解。
+
+### 再生成方式
+
+所有 main/SI artifacts 由现有 189 个 snapshots 经 Slurm finalizer 生成，
+不重跑 benchmark：
+
+```bash
+sbatch benchmarks/scripts/curie_cpu_li2024_formal_finalize.sbatch
+```
 
 ## 科学表述边界
 
@@ -129,5 +152,6 @@ PDF/PNG export；不改变上述 fits、`quantity` 或科学解释边界。完�
 ## 仍待决定
 
 1. 将旧 204/216 Hubbard-junction formal array 标为永久 partial archive，或补齐 12 个任务。
-2. 若需要 propagation-level 结论，增加完整 TDVP step benchmark。
-3. 若要更定量解释 Li rerun 的 `M_s` wall time，扩大 full-rank 区间并记录 throughput。
+
+已决定（2026-08-06）：不做完整 TDVP step benchmark；不扩大 `M_s` 区间；
+不做 `M_s` 时间占比/throughput 分解。

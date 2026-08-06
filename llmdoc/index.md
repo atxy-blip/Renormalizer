@@ -15,13 +15,14 @@
 ## 项目概览
 
 - `llmdoc/overview/project-overview.md`：Renormalizer 与本分支新增内容概览。
-- `llmdoc/overview/scaling-benchmark-status.md`：legacy formal、contraction diagnostics 和 Li.W.2024 rerun 的当前完成状态与主要拟合。
+- `llmdoc/overview/scaling-benchmark-status.md`：legacy formal、contraction diagnostics 和 Li.W.2024 rerun 的当前完成状态、正文/SI 分工与主要拟合。
 
 ## 架构说明
 
 - `llmdoc/architecture/op-to-contraction.md`：`Op` 如何变成局域矩阵、TTNO tensor、SOP term，并进入 contraction。
 - `llmdoc/architecture/ttns-ttno-environment.md`：TTNS/TTNO environment 现有实现与 SOP baseline 缺口。
 - `llmdoc/architecture/primitive-contraction-scaling.md`：paired phonon leaf 的 `d^4` 来源、primitive contraction 的 `d^2` 结构和 `M_s^4` internal-node FLOP 诊断。
+- `llmdoc/architecture/paired-vs-contracted-leaves.md`：两种声子叶因子化的结构、d^4/d^2 来源、自适应切换规则与全模型跳变解读。
 
 ## 操作指南
 
@@ -42,7 +43,7 @@
 - `llmdoc/memory/decisions/2026-07-08-curie-reno39-testing.md`：固定使用 Curie `reno-3.9` 环境测试的决策记录。
 - `llmdoc/memory/decisions/2026-07-09-operator-env-large-benchmark.md`：历史 root-only large benchmark 及其降级为归档数据源的原因。
 - `llmdoc/memory/lessons-learned.md`：从已归档 reflection 提炼的 benchmark identity 与长作业规则。
-- `llmdoc/memory/doc-gaps.md`：full-workflow `M_s` 有效指数、full-step timing 和 legacy formal 处置的闭合条件。
+- `llmdoc/memory/doc-gaps.md`：正文/SI 分工、刻意边界和 legacy formal 处置的闭合条件。
 - `llmdoc/memory/reflections/`：后续阶段性反思记录。
   - `llmdoc/memory/reflections/2026-07-13-ren-formal-tree-scaling-gaps.md`：formal 三变量 partial 结果、与 Ren.J.2022 的对象差异和待诊断问题。
   - `llmdoc/memory/reflections/2026-07-24-slurm-activation-and-scaling-diagnosis.md`：Curie conda/nounset 顺序故障和分层 scaling 诊断方法。

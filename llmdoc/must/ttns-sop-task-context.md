@@ -119,27 +119,19 @@ wall-time exponent；isolated shape-only kernel 的数学 FLOP 次数是 `M_s^4`
 quantity = local_effective_1site_apply_all_nodes
 ```
 
-largest-four-point wall-time fit：
+正式解释口径（2026-08-06）：
 
-```text
-N_b:
-  sop_no_env                  3.109
-  sop_mctdh_like_state_env    2.035
-  ttno_with_env               0.916
-
-M_s:
-  sop_no_env                  2.180
-  sop_mctdh_like_state_env    2.243
-  ttno_with_env               2.223
-
-large d, with primitive contraction when d > M_s:
-  all three methods           approximately constant
-```
-
-`N_b` panel 支持 `N_b^3/N_b^2/N_b` operator/state reuse 口径。`M_s` panel 的约
-2.2 仍是 whole-workflow wall-time 有效指数，不能替代 internal contraction 的
-`M_s^4` FLOP 结论。大 `d` whole-workflow 近常数是固定 body-tree work 主导，
-isolated leaf 和 TTNO storage 仍渐近 `d^2`。
+- 只对 `modes` panel 报 scaling 指数（largest-four fit）：N_b 约为
+  3.11 / 2.04 / 0.92（`sop_no_env` / `sop_mctdh_like_state_env` /
+  `ttno_with_env`），对应 `N_b^3 / N_b^2 / N_b`。
+- `state_bond` 与 `primitive_basis` panel 在正文只做参数稳健性检查：不报
+  指数、不画幂次参考线；相对排名在每个点上稳定。
+- M_s^4 与常数参考线、M_s/d 的 largest-four fits 保留在 SI
+  （`*_si_fits.csv`、`*_si_scaling_three_panel.*`）。
+- adaptive topology switch（d > M_s：paired ↔ contracted）会造成全模型
+  wall-time 跳变，正文图必须标注；见
+  `llmdoc/architecture/paired-vs-contracted-leaves.md`。
+- 不做完整 TDVP/传播 step 计时，这是刻意边界，不是缺口。
 
 详情：
 

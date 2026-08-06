@@ -1,5 +1,12 @@
 # Li.W.2024 Spin--Boson Operator Scaling Design
 
+> **2026-08-06 修订**：plot contract 已更新——正文图只对 `modes` panel 报
+> scaling 指数（`N_b^3/N_b^2/N_b`）；`state_bond` 与 `primitive_basis` panel
+> 在正文以参数稳健性呈现（不报指数、不画幂次参考线，标注 topology switch）；
+> 全部 panel 的指数与幂次参考线保留在 SI（`*_si_fits.csv`、
+> `*_si_scaling_three_panel.*`）。实现见
+> `docs/superpowers/plans/2026-08-06-operator-scaling-narrative-refactor.md`。
+
 ## Goal
 
 Replace the earlier Hubbard-junction formal scan with an isolated benchmark
