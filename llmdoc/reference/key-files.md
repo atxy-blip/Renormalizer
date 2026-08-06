@@ -93,7 +93,8 @@
   - 运行单个 Li formal task，并原子写 JSON-backed NPZ。
 
 - `benchmarks/finalize_li2024_formal.py`
-  - 检查 189 个 task IDs，只有全部 `status=ok` 时才生成 final aggregate 和 PDF。
+  - 检查 189 个 task IDs，只有全部 `status=ok` 时才生成 main/SI aggregate、
+    fits 和 PDF/PNG。
 
 - `benchmarks/plot_li2024_operator_scaling.py`
   - 聚合 Li.W.2024 repeats；支持 `figure_mode="main"/"si"`：main 只对 modes
@@ -124,6 +125,10 @@
 - `benchmarks/scripts/curie_cpu_ren_formal_array.sbatch`
   - Curie CPU 正式三变量 array job wrapper。
 
+- `benchmarks/scripts/curie_cpu_operator_scaling_validation.sbatch`
+  - Curie CPU 全量 operator-scaling 验证 wrapper（SOP/TTNO 等价、Li formal
+    契约、contraction diagnostics、adaptive benchmark、Nature plot style）。
+
 - `benchmarks/plot_operator_env_scaling.py`
   - 聚合 strict all-node raw rows，绘制三方法 Nature-style three-panel
     PDF/PNG；固定参考线不进入 legend。
@@ -138,7 +143,8 @@
   - formal manifest、snapshot 原子落盘和 task runner 测试。
 
 - `renormalizer/tn/tests/test_li2024_formal_benchmark.py`
-  - Li formal manifest、adaptive topology、small-point correctness 和 Slurm wrapper 测试。
+  - Li formal manifest、adaptive topology、small-point correctness、main/SI
+    契约与稳健性排名、Slurm wrapper 测试。
 
 - `renormalizer/tn/tests/test_contraction_scaling_diagnostics.py`
   - 精确 `M_s^4/d^4/d^2` path metrics、model topology、snapshot 和 summary 测试。

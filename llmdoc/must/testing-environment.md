@@ -77,6 +77,24 @@ result: 14 passed in 6.32s
 log: benchmarks/results/slurm_logs/sop_cpu_validation_114122.log
 ```
 
+新增 operator-scaling 全量验证脚本：
+
+```bash
+sbatch benchmarks/scripts/curie_cpu_operator_scaling_validation.sbatch
+```
+
+覆盖 SOP baseline、TTNO 等价、Li.W.2024 formal 契约、contraction
+diagnostics、adaptive benchmark 与 Nature plot style。最近记录：
+
+```text
+job_id: 121981
+node: curie-cpu002
+status: COMPLETED
+exit_code: 0:0
+result: 39 passed in 16.59s
+log: benchmarks/results/slurm_logs/op_scaling_validation_121981.log
+```
+
 ## Curie Slurm Adaptive Benchmark
 
 当前 adaptive benchmark 脚本：
@@ -254,6 +272,11 @@ conda activation 阶段失败。修正后的 replacement array `115549` 成功�
 最终为 144/144 个 `status=ok` snapshots。生产 array 前应先提交一个
 compute-node smoke task，并检查它实际生成 snapshot。
 
+2026-08-06 新建 validation wrapper 再次以 `set -u` 先于 conda activate 启动，
+job 121980 在 qt-main_activate.sh 阶段因 `QT_XCB_GL_INTEGRATION` unbound
+失败；按上述顺序修正后 job 121981 通过。任何新 sbatch 脚本必须复制
+`curie_cpu_li2024_formal_finalize.sbatch` 的激活顺序。
+
 ## 最新完成的正式任务
 
 Contraction diagnostics：
@@ -271,7 +294,9 @@ Li.W.2024 spin-boson rerun：
 compute-node smoke: 115694
 production array: 115695
 finalizer: 115708
+main/SI finalizer 再生成: 121979
 final snapshots: 189 / 189, all ok
+main fits: 6 行（仅 modes）；SI fits: 18 行（三 panel）
 ```
 
 这两组结果和当前验证命令见：

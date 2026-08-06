@@ -645,7 +645,7 @@ summary 为什么从 189 变为 63：
 
 - [ ] Session 11 完成
 
-对应：三张正式 Nature-style 图。
+对应：四张正式 Nature-style 图。
 
 ### 正式图件位置
 
@@ -654,15 +654,16 @@ summary 为什么从 189 变为 63：
 | 用途 | PDF | PNG 预览 |
 | --- | --- | --- |
 | 主文核心图 | [Li.W.2024 三方法标度图](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.pdf) | [预览](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.png) |
-| SI Figure S1 | [Complexity validation](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/complexity_validation.pdf) | [预览](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/complexity_validation.png) |
-| SI Figure S2 | [Model mechanism](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.pdf) | [预览](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.png) |
+| SI Figure S1 | [Li.W.2024 全指数三方法标度图](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_si_scaling_three_panel.pdf) | [预览](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_si_scaling_three_panel.png) |
+| SI Figure S2 | [Complexity validation](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/complexity_validation.pdf) | [预览](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/complexity_validation.png) |
+| SI Figure S3 | [Model mechanism](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.pdf) | [预览](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.png) |
 
 旧 `ren_formal_partial` 只有 204/216 个任务；historical strict-all-node 图缺少
 tracked raw CSV。两者都不能列为当前最终投稿图。
 
 ### 0–5 分钟：复述
 
-不看表格说出主文图和两张 SI 图各自回答什么问题。
+不看表格说出主文图和三张 SI 图各自回答什么问题。
 
 ### 5–30 分钟：逐 panel 阅读
 
@@ -676,7 +677,19 @@ tracked raw CSV。两者都不能列为当前最终投稿图。
 (c) d：
 ```
 
-必须读出 largest-four-point wall-time exponents：
+主文图只对 `(a) N_b` 报 largest-four-point wall-time exponents：
+
+| Panel | no env | strict state env | TTNO + env |
+| --- | ---: | ---: | ---: |
+| `N_b` | 3.109 | 2.035 | 0.916 |
+
+`(b) M_s` 与 `(c) d` 是参数稳健性面板：不报指数、不画幂次参考线；读三条
+方法的相对排名在每个参数点上是否稳定，以及 `M_s=10` / `d=20` 处的
+topology switch 竖线。
+
+#### SI Figure S1：Li.W.2024 全指数三方法标度图
+
+SI 保留全部 panel 的 largest-four-point wall-time exponents：
 
 | Panel | no env | strict state env | TTNO + env |
 | --- | ---: | ---: | ---: |
@@ -684,7 +697,10 @@ tracked raw CSV。两者都不能列为当前最终投稿图。
 | `M_s` | 2.180 | 2.243 | 2.223 |
 | large `d` | -0.004 | 0.002 | 0.024 |
 
-#### SI Figure S1：complexity validation
+参考线仍为 `N_b^3/N_b^2/N_b`、`M_s^4` 与大 `d` 常数；它们是有效 wall-time
+参考，不是渐近 FLOP 指数。
+
+#### SI Figure S2：complexity validation
 
 写下它支持的三项机制：
 
@@ -701,7 +717,7 @@ primitive-contracted one-mode leaf：
 - primitive-contracted leaf 为 `d^2`；
 - isolated wall-time tail 可以低于精确 FLOP power。
 
-#### SI Figure S2：model mechanism
+#### SI Figure S3：model mechanism
 
 给四类证据各写一句话：
 
@@ -717,9 +733,9 @@ peak process memory：
 ```text
 为什么主文图能支持三条 operator path 的核心比较：
 
-为什么 S1 属于数学/isolated-kernel 支撑：
+为什么 S2 属于数学/isolated-kernel 支撑：
 
-为什么 S2 属于 mechanism/memory 支撑：
+为什么 S3 属于 mechanism/memory 支撑：
 
 为什么 full-workflow M_s≈2.2 不否定 internal FLOPs M_s^4：
 
@@ -729,10 +745,11 @@ peak process memory：
 ### 40–45 分钟：三句话
 
 1. 主文图展示同一 all-node quantity 下三种复用策略的正式 wall-time scaling。
-2. SI S1 用 FLOPs 和 isolated kernels 证明 `M_s^4`、`d^4` 与 `d^2` 的 tensor 机制。
-3. SI S2 用阶段时间、storage 和 memory 解释这些机制如何进入完整模型。
+2. SI S1 保留主文去掉的 M_s/d 指数与幂次参考线，供审稿人复核有效 wall-time 指数。
+3. SI S2 用 FLOPs 和 isolated kernels 证明 `M_s^4`、`d^4` 与 `d^2` 的 tensor 机制。
+4. SI S3 用阶段时间、storage 和 memory 解释这些机制如何进入完整模型。
 
-完成证据：为三张图的每个 panel 写一句话，并能解释 wall-time exponent 与 FLOP complexity 不等价。
+完成证据：为四张图的每个 panel 写一句话，并能解释 wall-time exponent 与 FLOP complexity 不等价。
 
 停止规则：不要试图在一节内写完整论文 caption；本节只完成“每个 panel 一句话”。
 
@@ -768,7 +785,7 @@ peak process memory：
 5. 效果：`N_b` tail exponents 为 3.109、2.035、0.916。
 6. 验证：189/189 snapshots，三条方法数值一致。
 7. 边界：不是 full TDVP step；`M_s^4`/`d^4`/`d^2` 来自分层 diagnostics。
-8. 图件：一张主文图，两张 SI 支撑图。
+8. 图件：一张主文图，三张 SI 图（Li2024 SI、complexity validation、model mechanism）。
 
 录音或请同伴计时。中途卡住时只在纸上标记，不立刻看答案。
 
@@ -807,7 +824,7 @@ peak process memory：
 - 总分至少 8/10；
 - 没有任何一项为 0；
 - 全程没有阅读 notebook 的 Oral Recap；
-- 能准确指出主文图和两张 SI 图的 PDF。
+- 能准确指出主文图和三张 SI 图的 PDF。
 
 三句话最终版本：
 
@@ -843,6 +860,6 @@ TTNO path 还通过 operator bonds 共享 operator structure。
 full-workflow wall time 与 isolated FLOP complexity 必须分开。
 
 图件：
-主文放 Li.W.2024 three-panel scaling；
-SI 放 complexity validation 和 model mechanism。
+主文放 Li.W.2024 three-panel scaling（modes 指数 + M_s/d 稳健性面板）；
+SI 放 Li.W.2024 全指数 three-panel、complexity validation 和 model mechanism。
 ```

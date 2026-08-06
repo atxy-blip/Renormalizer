@@ -69,6 +69,12 @@ TTNO 约 `d^4`。该数据集保留为 partial historical source。
 旧 `d^4` 来自 paired two-mode leaf 的四个 physical operator axes。启用 primitive
 contraction 后，one-mode leaf 的 TTNO storage 和 isolated contraction 渐近 `d^2`。
 
+Li.W.2024 正式图采用 main/SI 分工：正文只报 `modes` panel 的
+`N_b^3/N_b^2/N_b` 指数，M_s/d 以参数稳健性呈现并标注 topology switch；
+全部 panel 的指数与幂次参考线保留在 SI。详见
+`llmdoc/overview/scaling-benchmark-status.md` 与
+`llmdoc/architecture/paired-vs-contracted-leaves.md`。
+
 当前结果和待办见：
 
 - `llmdoc/overview/scaling-benchmark-status.md`

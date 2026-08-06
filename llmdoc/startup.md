@@ -44,3 +44,4 @@ scaling 解释必须区分 timing object：
 
 - `llmdoc/overview/scaling-benchmark-status.md`
 - `llmdoc/architecture/primitive-contraction-scaling.md`
+- `llmdoc/architecture/paired-vs-contracted-leaves.md`

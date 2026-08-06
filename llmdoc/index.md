@@ -47,6 +47,7 @@
 - `llmdoc/memory/reflections/`：后续阶段性反思记录。
   - `llmdoc/memory/reflections/2026-07-13-ren-formal-tree-scaling-gaps.md`：formal 三变量 partial 结果、与 Ren.J.2022 的对象差异和待诊断问题。
   - `llmdoc/memory/reflections/2026-07-24-slurm-activation-and-scaling-diagnosis.md`：Curie conda/nounset 顺序故障和分层 scaling 诊断方法。
+  - `llmdoc/memory/reflections/2026-08-06-main-si-slurm-activation-repeat.md`：main/SI 分工与 Slurm wrapper 激活顺序重复错误的修正记录。
 - `llmdoc/memory/archive/2026-07-13/`：已被 lessons 和稳定文档总结的 2026-07-10 原始 reflection。
 
 `.llmdoc-tmp/` 是临时调查区，不属于稳定文档。

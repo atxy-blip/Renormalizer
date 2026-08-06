@@ -108,6 +108,26 @@ conda run -n reno-3.9 python -m benchmarks.plot_li2024_operator_scaling \
 - `benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.pdf`
 - `benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.png`
 
+Main/SI split (2026-08-06):
+
+- Main figure: only the `modes` panel draws the `N_b^3/N_b^2/N_b` guides and
+  reports exponents. The `state_bond` and `primitive_basis` panels are
+  robustness checks without power-law guides; each carries a vertical
+  topology-switch line (`M_s=10` and `d=20`, respectively).
+- SI figure: all three panels keep their largest-four fits and power-law
+  guides (`M_s^4` for state bond, constant for large `d`). It is generated
+  together with the main figure by the Slurm finalizer:
+
+```text
+benchmarks/results/operator_env_scaling/final/
+  li2024_spin_boson_20260713_si_scaling_three_panel.pdf
+  li2024_spin_boson_20260713_si_scaling_three_panel.png
+```
+
+The plot CLI (`python -m benchmarks.plot_li2024_operator_scaling ...`) defaults
+to the main figure; SI output is produced by
+`sbatch benchmarks/scripts/curie_cpu_li2024_formal_finalize.sbatch`.
+
 ### Contraction diagnostics two-by-two figures
 
 `benchmarks/plot_contraction_scaling_diagnostics.py` regenerates both
@@ -125,7 +145,7 @@ conda run -n reno-3.9 python -m benchmarks.plot_contraction_scaling_diagnostics 
 - `benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.pdf`
 - `benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.png`
 
-Together, the Li figure pair and these two diagnostic pairs are the six
+Together, the Li main/SI pairs and these two diagnostic pairs are the eight
 tracked Nature-style artifacts. The figures preserve the existing fitted
 exponents and the distinction between optimized-FLOP complexity, isolated
 kernel timing, and whole-workflow timing; presentation changes are not new
