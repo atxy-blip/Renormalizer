@@ -10,6 +10,18 @@ from benchmarks.analyze_li2024_stage_breakdown import (
     summarize_modes,
 )
 from benchmarks.finalize_li2024_construction import generate as generate_construction
+from benchmarks.finalize_hubbard_balanced import (
+    FORMAL_METHODS as HUBBARD_METHODS,
+    generate as generate_hubbard,
+)
+from benchmarks.hubbard_balanced_manifest import (
+    BALANCED_PAIRS,
+    HUBBARD_PRIMITIVE_BASIS,
+    HUBBARD_STATE_BOND,
+    hubbard_balanced_tasks,
+    read_task as read_hubbard_task,
+    write_manifest as write_hubbard_manifest,
+)
 from benchmarks.li2024_construction_manifest import (
     CONSTRUCTION_MODE_VALUES,
     CONSTRUCTION_PRIMITIVE_BASIS_VALUES,
@@ -24,6 +36,8 @@ from benchmarks.run_li2024_construction_point import (
     run_construction_task,
     write_snapshot_atomic,
 )
+from benchmarks.run_hubbard_balanced_point import run_hubbard_balanced_point
+from types import SimpleNamespace
 
 
 def test_construction_manifest_matches_li2024_points():
@@ -158,3 +172,75 @@ def test_construction_finalizer_accepts_ok_rows(tmp_path):
     assert len(fits) == 2 * 3
     assert pdf.name == "li2024_construction_scaling.pdf"
     assert png.name == "li2024_construction_scaling.png"
+
+
+def test_hubbard_balanced_manifest_matches_growth_plan():
+    tasks = hubbard_balanced_tasks(repeats=3)
+    assert len(tasks) == len(BALANCED_PAIRS) * 3 * 3 == 45
+    assert [task.task_id for task in tasks] == list(range(45))
+    first = tasks[0]
+    assert (first.n_lead, first.n_phonon) == (4, 1)
+    assert first.n_total_sites == 4 * 4 + 2 + 1 == 19
+    assert first.state_bond == HUBBARD_STATE_BOND == 20
+    assert first.primitive_basis == HUBBARD_PRIMITIVE_BASIS == 10
+    assert first.contract_primitive is False
+    methods = {task.method for task in tasks}
+    assert methods == set(HUBBARD_METHODS)
+
+
+def test_hubbard_balanced_manifest_round_trip(tmp_path):
+    path = tmp_path / "manifest.tsv"
+    write_hubbard_manifest(path, repeats=3)
+    task = read_hubbard_task(path, 12)
+    assert task.panel == "balanced"
+    assert (task.n_lead, task.n_phonon) == (8, 2)
+    assert task.repeat_id == 0
+
+
+def test_hubbard_balanced_point_small_smoke():
+    args = SimpleNamespace(
+        timeout_sec=120,
+        memory_limit_mb=0.0,
+        active_scope="all_nodes",
+    )
+    rows = run_hubbard_balanced_point(
+        n_lead=1,
+        n_phonon=1,
+        state_bond=2,
+        primitive_basis=2,
+        method="sop_no_env",
+        repeat_id=0,
+        args=args,
+        git_commit="test",
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["status"] == "ok"
+    assert row["case_name"] == "hubbard_junction"
+    assert row["n_total_sites"] == 4 * 1 + 2 + 1
+    assert 12 <= row["n_sop_terms"] <= 16
+    assert row["relative_error_vs_ttno"] < 1e-12
+
+
+def test_hubbard_balanced_finalizer_accepts_ok_rows(tmp_path):
+    rows = []
+    for task in hubbard_balanced_tasks(repeats=1):
+        rows.append({
+            **asdict(task),
+            "n_total_sites": task.n_total_sites,
+            "n_sop_terms": 12 * task.n_lead + 4 * task.n_phonon,
+            "n_active_nodes": task.n_total_sites,
+            "ttno_max_bond": 3,
+            "state_max_bond": task.state_bond,
+            "time_total_sec": 0.1 * task.n_total_sites,
+            "time_env_build_sec": 0.05 * task.n_total_sites,
+            "time_apply_sec": 0.05 * task.n_total_sites,
+            "memory_peak_mb": 1.0,
+            "relative_error_vs_ttno": 0.0,
+            "status": "ok",
+        })
+    summary, fits, pdf, png = generate_hubbard(rows, tmp_path / "hubbard")
+    assert len(summary) == 15
+    assert len(fits) == 3
+    assert pdf.name == "hubbard_hubbard_scaling.pdf"
+    assert png.name == "hubbard_hubbard_scaling.png"
