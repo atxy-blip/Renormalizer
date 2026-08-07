@@ -46,6 +46,17 @@ def measure_point(n_lead, n_phonon, primitive_basis=HUBBARD_PRIMITIVE_BASIS):
     supports = [len(term.local_ops) for term in sop.terms]
     sop_factors = sum(supports)
     ttno_elements = int(sum(node.tensor.size for node in ttno.node_list))
+
+    phonon_leaf_modes = []
+    phonon_elements = 0
+    for tree_node, tensor_node in zip(tree.node_list, ttno.node_list):
+        n_phonon_modes = sum(
+            basis.__class__.__name__ == "BasisSHO" for basis in tree_node.basis_sets
+        )
+        if n_phonon_modes:
+            phonon_leaf_modes.append(n_phonon_modes)
+            phonon_elements += int(tensor_node.tensor.size)
+
     return {
         "n_lead": n_lead,
         "n_phonon": n_phonon,
@@ -59,6 +70,10 @@ def measure_point(n_lead, n_phonon, primitive_basis=HUBBARD_PRIMITIVE_BASIS):
         ),
         "sop_local_factors": sop_factors,
         "ttno_tensor_elements": ttno_elements,
+        "phonon_leaf_modes": json.dumps(sorted(phonon_leaf_modes)),
+        "n_phonon_leaf_nodes": len(phonon_leaf_modes),
+        "phonon_operator_elements": phonon_elements,
+        "non_phonon_operator_elements": ttno_elements - phonon_elements,
         "compression_ratio": sop_factors / ttno_elements,
         "ttno_max_bond": max(ttno.bond_dims),
         "ttno_mean_bond": float(np.mean(ttno.bond_dims)),
