@@ -7,15 +7,20 @@
 ## 0.0 正文/SI 分工建议（JCTC）
 
 论文正文聚焦“分子结有限温数值算法”的可靠性与效率，建议只放一张双面板图
-（`Fig_Main_Reliability_Efficiency`）：
+（`Fig_Main_Mechanism_Efficiency`）：
 
-- (a) 数值可靠性：三条路径的 local action 相对误差随 N 保持机器精度；
+- (a) 算符结构机制：JW 串使 SOP 局域因子总数按 ≈N^1.84 增长，而 TTNO
+  张量元素按 ≈N^1.03 增长且 max bond 恒为 7；
 - (b) 单次 sweep 效率：Hubbard junction 上 TTNO≈N¹、strict SOP≈N²、
   no-env SOP≈N³。
 
+三条路径的数值一致性（≤1.2e-14，机器精度）只在正文用一句话陈述，不单独
+画图：log 尺度下 1e-15→1e-14 的曲线会夸大误差增长。
+
 其余全部进 SI，按 `../ttns-test` Nature 风格重绘：
 `Fig_SI_Li2024_Scaling`、`Fig_SI_Stage_Breakdown`、`Fig_SI_Construction`、
-`Fig_SI_JW_Mechanism`、`Fig_SI_Cost_Metrics`、`Fig_SI_Hubbard_Scaling`。
+`Fig_SI_JW_Mechanism`、`Fig_SI_Cost_Metrics`（时间/内存/内存×时间/加速比）、
+`Fig_SI_Hubbard_Scaling`。
 
 ## 0. 总前提与口径
 
@@ -277,22 +282,22 @@ largest-four 指数（vs N_total）：
 - 这正是分子结区别于纯玻色模型的地方：fermionic JW 串是 SOP 开销的
   主要放大器，也是 TTNO 收益最大的来源之一。
 
-## 7. 成本指标：单次 sweep、内存×时间与误差（分子结）
+## 7. 成本指标：单次 sweep、内存×时间与加速比（分子结）
 
 ![Hubbard cost metrics](../benchmarks/results/operator_env_scaling/figures/hubbard_cost_metrics.png)
 
 **前提**：all-node local action 之和就是一次完整 sweep 的 kernel 成本；
 真实 dynamics 会重复很多次 sweep，因此单次成本直接决定整条轨迹的开销。
-这里同时报告峰值内存、内存×时间乘积和相对误差，避免“省时间但耗内存”
-或“靠近似换速度”的质疑。
+这里同时报告峰值内存、内存×时间乘积和相对 TTNO 加速比；三条路径的数值
+一致性（≤1.2e-14，机器精度）用文字陈述，不画误差- N 曲线。
 
 **结果**（largest-four 指数 vs N_total）：
 
-| 方法 | time α | memory α | memory×time α | 最大相对误差 |
+| 方法 | time α | memory α | memory×time α | 相对 TTNO 加速比（范围） |
 | --- | ---: | ---: | ---: | ---: |
-| `sop_no_env` | 3.180 | 0.386 | 3.566 | 9.5e-15 |
-| `sop_mctdh_like_state_env` | 2.081 | 2.030 | 4.111 | 1.2e-14 |
-| `ttno_with_env` | 1.038 | 0.096 | 1.134 | 0（参考） |
+| `sop_no_env` | 3.180 | 0.386 | 3.566 | 33–6 350（N=19–138） |
+| `sop_mctdh_like_state_env` | 2.081 | 2.030 | 4.111 | 11–327（N=19–274） |
+| `ttno_with_env` | 1.038 | 0.096 | 1.134 | 1（参考） |
 
 典型绝对值（N=274）：
 
@@ -308,8 +313,10 @@ largest-four 指数（vs N_total）：
   中最“贵”的联合指标。
 - no-env 虽然省内存，但单次 sweep 时间按 N³ 涨；N=138 时一次 sweep 已需
   约 1.6 小时，而 TTNO 不到 1 秒。
-- 三条路径最大相对误差 ≤1.2e-14，说明优势不是精度换来的；TTNO 作为
-  参考路径本身误差为 0，SOP 两条路径也保持机器精度。
+- 相对 TTNO 的加速比随 N 快速增长：strict state env 在 N=274 处慢 327 倍；
+  no-env 在 N=138 处已慢约 6 350 倍（其 N=274 点未完成，故不列）。
+- 三条路径最大相对误差 ≤1.2e-14（机器精度），优势不是精度换来的；该结论
+  只在文字中陈述，避免 log 尺度误差图夸大 1e-15→1e-14 的视觉增长。
 
 ## 8. 总体启示与边界
 

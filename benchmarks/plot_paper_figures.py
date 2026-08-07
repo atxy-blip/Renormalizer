@@ -2,11 +2,13 @@
 """Regenerate publication-facing figures in the ../ttns-test Nature style.
 
 Decision (JCTC methods paper):
-- main text: one two-panel figure with (a) numerical reliability and
+- main text: one two-panel figure with (a) operator-structure mechanism and
   (b) per-sweep efficiency of the molecular-junction operator action.
+  Numerical equivalence is stated in one sentence, not plotted (errors are
+  all within machine precision; a log-scale curve would exaggerate growth).
 - SI: spin-boson full-exponent scaling, stage breakdown, construction cost,
-  Jordan-Wigner mechanism, cost metrics, and the full three-method Hubbard
-  scaling.
+  Jordan-Wigner mechanism, cost metrics (time / memory / memory x time /
+  speedup), and the full three-method Hubbard scaling.
 """
 
 import argparse
@@ -114,44 +116,47 @@ def sort_rows(rows, x_field):
     return sorted(rows, key=lambda r: float(r[x_field]))
 
 
-def plot_main(hub_rows, pdf_path):
-    """(a) reliability vs N; (b) per-sweep efficiency vs N."""
+def plot_main(mech_rows, hub_rows, pdf_path):
+    """(a) operator-structure mechanism; (b) per-sweep efficiency vs N."""
 
     with ttns_style():
-        fig, (ax_r, ax_e) = plt.subplots(1, 2, figsize=(7.0, 2.8))
+        fig, (ax_m, ax_e) = plt.subplots(1, 2, figsize=(7.0, 2.8))
         fig.subplots_adjust(left=0.12, right=0.98, bottom=0.20, top=0.88, wspace=0.42)
 
-        for method in ("sop_no_env", "sop_mctdh_like_state_env"):
-            pts = sort_rows(
-                [r for r in hub_rows if r["method"] == method], "n_total_sites"
+        pts = sort_rows(mech_rows, "n_total_sites")
+        x = [float(r["n_total_sites"]) for r in pts]
+        for field, color, label in (
+            ("sop_local_factors", "#00529B", "SOP local factors"),
+            ("ttno_tensor_elements", "#007A33", "TTNO tensor elements"),
+        ):
+            y = [float(r[field]) for r in pts]
+            ax_m.plot(x, y, marker="o", color=color, label=label)
+            alpha = fit_alpha(pts[-4:], "n_total_sites", field)
+            ax_m.text(
+                x[-1],
+                y[-1],
+                rf"  $\alpha={alpha:.2f}$",
+                fontsize=7,
+                color=color,
+                va="center",
             )
-            x = [float(r["n_total_sites"]) for r in pts]
-            y = [float(r["relative_error_max_vs_ttno"]) for r in pts]
-            ax_r.plot(
-                x,
-                y,
-                marker=METHOD_MARKERS[method],
-                color=METHOD_COLORS[method],
-                label=METHOD_LABELS[method],
-            )
-        ax_r.axhline(1e-15, color="0.45", linestyle=":", linewidth=0.8)
-        ax_r.text(
-            0.98,
-            1.4e-15,
-            "machine precision",
-            transform=ax_r.get_yaxis_transform(),
-            ha="right",
-            va="bottom",
+        ax_m.text(
+            0.03,
+            0.97,
+            r"TTNO max bond $=7$",
+            transform=ax_m.transAxes,
             fontsize=7,
-            color="0.35",
+            ha="left",
+            va="top",
+            color="#007A33",
         )
-        ax_r.set_xscale("log", base=2)
-        ax_r.set_yscale("log")
-        ax_r.set_xlabel(r"Total sites, $N$")
-        ax_r.set_ylabel("Relative error vs TTNO")
-        label_panel(ax_r, "a", "Numerical reliability")
-        finish_axis(ax_r)
-        ax_r.legend(loc="upper right", frameon=False)
+        ax_m.set_xscale("log", base=2)
+        ax_m.set_yscale("log")
+        ax_m.set_xlabel(r"Total sites, $N$")
+        ax_m.set_ylabel("Total operator factors / elements")
+        label_panel(ax_m, "a", "Operator structure")
+        finish_axis(ax_m)
+        ax_m.legend(loc="upper left", frameon=False)
 
         for method in METHODS:
             pts = sort_rows(
@@ -363,12 +368,17 @@ def plot_si_cost(cost_rows, pdf_path):
         ("time_per_sweep_mean_sec", "Per-sweep wall time (s)", True),
         ("memory_peak_mean_mb", "Peak memory (MB)", False),
         ("memory_time_product_mb_s", "Memory x time (MB s)", False),
-        ("relative_error_max_vs_ttno", "Relative error vs TTNO", False),
+        ("speedup_vs_ttno", "Speedup vs TTNO", False),
     )
     with ttns_style():
         fig, axes = plt.subplots(2, 2, figsize=(7.0, 5.4))
         fig.subplots_adjust(left=0.13, right=0.98, bottom=0.12, top=0.95, wspace=0.35, hspace=0.55)
         for ax, (field, ylabel, guides) in zip(axes.ravel(), panels):
+            ttno_by_n = {
+                float(r["n_total_sites"]): float(r["time_per_sweep_mean_sec"])
+                for r in cost_rows
+                if r["method"] == "ttno_with_env"
+            }
             for method in METHODS:
                 pts = sort_rows(
                     [r for r in cost_rows if r["method"] == method], "n_total_sites"
@@ -376,7 +386,21 @@ def plot_si_cost(cost_rows, pdf_path):
                 if not pts:
                     continue
                 x = [float(r["n_total_sites"]) for r in pts]
-                y = [float(r[field]) for r in pts]
+                if field == "speedup_vs_ttno":
+                    if method == "ttno_with_env":
+                        continue
+                    y = [
+                        float(r["time_per_sweep_mean_sec"]) / ttno_by_n[float(r["n_total_sites"])]
+                        for r in pts
+                        if float(r["n_total_sites"]) in ttno_by_n
+                    ]
+                    x = [
+                        float(r["n_total_sites"])
+                        for r in pts
+                        if float(r["n_total_sites"]) in ttno_by_n
+                    ]
+                else:
+                    y = [float(r[field]) for r in pts]
                 ax.plot(
                     x,
                     y,
@@ -388,7 +412,7 @@ def plot_si_cost(cost_rows, pdf_path):
                     power = REFERENCE_POWERS[method]
                     ax.plot(x, [y[-1] * (float(xi) / x[-1]) ** power for xi in x], linestyle="--", color=METHOD_COLORS[method], alpha=0.6)
             ax.set_xscale("log", base=2)
-            if field != "relative_error_max_vs_ttno":
+            if field != "speedup_vs_ttno":
                 ax.set_yscale("log")
             ax.set_xlabel(r"Total sites, $N$")
             ax.set_ylabel(ylabel)
@@ -436,8 +460,13 @@ def generate(figures_dir):
     result_root = Path("benchmarks/results/operator_env_scaling/final")
 
     hub_rows = read_csv(result_root / "hubbard_junction_20260806_hubbard_summary.csv")
+    mech_rows = read_csv(result_root / "hubbard_junction_20260806_mechanism_summary.csv")
     outputs = [
-        plot_main(hub_rows, figures_dir / "Fig_Main_Reliability_Efficiency.pdf"),
+        plot_main(
+            mech_rows,
+            hub_rows,
+            figures_dir / "Fig_Main_Mechanism_Efficiency.pdf",
+        ),
         plot_si_li2024(
             read_csv(result_root / "li2024_spin_boson_20260713_summary.csv"),
             figures_dir / "Fig_SI_Li2024_Scaling.pdf",
