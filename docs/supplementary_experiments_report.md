@@ -21,6 +21,55 @@
 - 正式数据：Li.W.2024 spin-boson 189/189 snapshots；construction 补充
   63/63 snapshots；Hubbard balanced 补充 42/45 snapshots（缺失点见第 5 节）。
 
+## 0.1 模型与树结构
+
+### Li.W.2024 sub-Ohmic spin-boson（SI 模型）
+
+**Hamiltonian**：一个 spin 与 N_b 个声子 mode 耦合，
+`H = σ_x + Σ_i [p_i²/2 + ω_i² x_i²/2 + g_i σ_z x_i]`，参数
+`s=0.5, ω_c=20Δ, α=0.05`，Wang1 离散化；term 数 `1 + 3N_b`。
+
+**树结构**：根节点挂一个 spin 叶（BasisHalfSpin，2 态）和 N_b 个声子
+mode 构成的平衡二叉树；声子叶默认 `paired_no_contraction`（d=10 ≤ M_s=20，
+每叶合并两个 primitive mode），当 `d > M_s` 时切换为
+`primitive_contracted`（每叶一个 mode）。
+
+**观测元数据**（modes panel）：
+
+| N_b | total sites | active nodes | tree depth | local basis | TTNO max bond |
+| --- | ---: | ---: | ---: | --- | ---: |
+| 4 | 5 | 4 | 2 | HalfSpin×1 + SHO(10)×4 | 3 |
+| 256 | 257 | 256 | 8 | HalfSpin×1 + SHO(10)×256 + Dummy×127 | 3 |
+
+State 为随机 TTNS，`qntot=0, M_s=20`。
+
+### Hubbard junction 分子结（主模型）
+
+**Hamiltonian 结构**：
+
+- 每个 lead mode 有 4 个 fermionic 位点（L_i, L^i, R_i, R^i），共
+  `4·n_lead` 个 lead 位点；lead 项包括 onsite 和带 Jordan-Wigner `Z`
+  串的 lead↔bridge hopping；
+- 两个 bridge spin 位点（s^, s_），可带 onsite 与 Hubbard U；
+- `n_phonon` 个声子位点，含 `p², x²` 与电子-声子耦合 `σ_x·x` 类项。
+
+term 数在扫描点上精确为 `12·n_lead + 4·n_phonon`
+（实测 52 / 104 / 208 / 416 / 832）。
+
+**树结构**：左右 lead 组各构成一个平衡二叉树（含 BasisDummy 平衡节点），
+两个 bridge 节点串联并把 lead 树与声子平衡二叉树接在一起；balanced 扫描
+固定 `d=10 ≤ M_s=20`，声子叶为 paired leaf。
+
+**观测元数据**：
+
+| (n_lead, n_phonon) | total sites | active nodes | local basis | TTNO max bond |
+| --- | ---: | ---: | --- | ---: |
+| (4, 1) | 19 | 17 | HalfSpin(2)×18 + SHO(10)×1 + Dummy×6 | 7 |
+| (64, 16) | 274 | 271 | HalfSpin(2)×258 + SHO(10)×16 + Dummy×N | 7 |
+
+State 为随机 TTNS，`qntot=0, M_s=20`；fermionic parity/JW 约定沿用
+`junction_zt_hubbard.py` 的 symbolic Op 构造。
+
 ## 1. 主文图：modes 标度（spin-boson，SI 用全指数版）
 
 ![Li2024 modes main scaling](../benchmarks/results/operator_env_scaling/figures/li2024_modes_main_scaling.png)
