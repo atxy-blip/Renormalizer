@@ -4,6 +4,19 @@
 > 数据来源：`benchmarks/results/operator_env_scaling/`（Slurm 原子快照）
 > 图件目录：`benchmarks/results/operator_env_scaling/figures/`
 
+## 0.0 正文/SI 分工建议（JCTC）
+
+论文正文聚焦“分子结有限温数值算法”的可靠性与效率，建议只放一张双面板图
+（`Fig_Main_Reliability_Efficiency`）：
+
+- (a) 数值可靠性：三条路径的 local action 相对误差随 N 保持机器精度；
+- (b) 单次 sweep 效率：Hubbard junction 上 TTNO≈N¹、strict SOP≈N²、
+  no-env SOP≈N³。
+
+其余全部进 SI，按 `../ttns-test` Nature 风格重绘：
+`Fig_SI_Li2024_Scaling`、`Fig_SI_Stage_Breakdown`、`Fig_SI_Construction`、
+`Fig_SI_JW_Mechanism`、`Fig_SI_Cost_Metrics`、`Fig_SI_Hubbard_Scaling`。
+
 ## 0. 总前提与口径
 
 所有实验回答同一个问题：**在波函数 ansatz、tree 拓扑、symbolic Hamiltonian
