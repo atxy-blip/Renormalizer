@@ -152,6 +152,14 @@ def test_stage_breakdown_artifacts(tmp_path):
     assert png.stat().st_size > 0
 
 
+def test_stage_breakdown_figures_dir_contract(tmp_path):
+    figures_dir = tmp_path / "figs"
+    _, _, pdf, png = generate_stage(_stage_rows(), tmp_path / "x", figures_dir=figures_dir)
+    assert pdf.name == "li2024_si_stage_breakdown.pdf"
+    assert png.name == "li2024_si_stage_breakdown.png"
+    assert pdf.parent == figures_dir
+
+
 def test_construction_finalizer_accepts_ok_rows(tmp_path):
     rows = []
     for task in construction_tasks(repeats=3):

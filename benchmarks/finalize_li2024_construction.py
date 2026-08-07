@@ -191,7 +191,7 @@ def plot(summary, pdf_path):
     return pdf, png
 
 
-def generate(rows, output_prefix):
+def generate(rows, output_prefix, figures_dir=None):
     ok_rows = [row for row in rows if row.get("status") == "ok"]
     if not ok_rows:
         raise RuntimeError("no ok snapshots")
@@ -199,7 +199,10 @@ def generate(rows, output_prefix):
     fits = compute_fits(summary)
     _write_csv(output_prefix.with_name(output_prefix.name + "_construction_summary.csv"), summary)
     _write_csv(output_prefix.with_name(output_prefix.name + "_construction_fits.csv"), fits)
-    pdf_path = output_prefix.with_name(output_prefix.name + "_construction_scaling.pdf")
+    if figures_dir is None:
+        pdf_path = output_prefix.with_name(output_prefix.name + "_construction_scaling.pdf")
+    else:
+        pdf_path = Path(figures_dir) / "li2024_si_construction_scaling.pdf"
     pdf, png = plot(summary, pdf_path)
     return summary, fits, pdf, png
 
@@ -209,6 +212,7 @@ def main():
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--snapshot-dir", type=Path, required=True)
     parser.add_argument("--output-prefix", type=Path, required=True)
+    parser.add_argument("--figures-dir", type=Path, default=None)
     parser.add_argument("--allow-partial", action="store_true")
     args = parser.parse_args()
 
@@ -217,7 +221,7 @@ def main():
     missing = missing_task_ids(rows, expected)
     if missing and not args.allow_partial:
         raise RuntimeError(f"refusing to label incomplete result as final: {sorted(missing)}")
-    summary, fits, pdf, png = generate(rows, args.output_prefix)
+    summary, fits, pdf, png = generate(rows, args.output_prefix, figures_dir=args.figures_dir)
     print(
         f"Collected {len(rows)}/{len(expected)} snapshots; "
         f"wrote {len(summary)} summary rows, {len(fits)} fits, "

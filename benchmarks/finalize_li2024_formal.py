@@ -49,6 +49,7 @@ def main():
     parser.add_argument("--raw-output", type=Path, required=True)
     parser.add_argument("--missing-output", type=Path, required=True)
     parser.add_argument("--output-prefix", type=Path, required=True)
+    parser.add_argument("--figures-dir", type=Path, default=None)
     parser.add_argument("--allow-partial", action="store_true")
     args = parser.parse_args()
 
@@ -73,8 +74,12 @@ def main():
         raise RuntimeError(
             f"refusing to label incomplete result as final: {len(missing)} missing/error tasks"
         )
-    summary, fits, pdf, png = generate(rows, args.output_prefix, figure_mode="main")
-    summary, si_fits, si_pdf, si_png = generate(rows, args.output_prefix, figure_mode="si")
+    summary, fits, pdf, png = generate(
+        rows, args.output_prefix, figure_mode="main", figures_dir=args.figures_dir
+    )
+    summary, si_fits, si_pdf, si_png = generate(
+        rows, args.output_prefix, figure_mode="si", figures_dir=args.figures_dir
+    )
     print(
         f"Collected {len(rows)}/{len(expected)} snapshots; "
         f"wrote {len(summary)} summary rows, {len(fits)} main fits, {len(si_fits)} SI fits, "

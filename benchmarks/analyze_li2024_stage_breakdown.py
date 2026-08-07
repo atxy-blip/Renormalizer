@@ -177,12 +177,15 @@ def plot(summary, pdf_path):
     return pdf, png
 
 
-def generate(rows, output_prefix):
+def generate(rows, output_prefix, figures_dir=None):
     summary = summarize_modes(rows)
     fits = compute_fits(summary)
     _write_csv(output_prefix.with_name(output_prefix.name + "_stage_summary.csv"), summary)
     _write_csv(output_prefix.with_name(output_prefix.name + "_stage_fits.csv"), fits)
-    pdf_path = output_prefix.with_name(output_prefix.name + "_stage_breakdown.pdf")
+    if figures_dir is None:
+        pdf_path = output_prefix.with_name(output_prefix.name + "_stage_breakdown.pdf")
+    else:
+        pdf_path = Path(figures_dir) / "li2024_si_stage_breakdown.pdf"
     pdf, png = plot(summary, pdf_path)
     return summary, fits, pdf, png
 
@@ -191,8 +194,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw", type=Path, required=True)
     parser.add_argument("--output-prefix", type=Path, required=True)
+    parser.add_argument("--figures-dir", type=Path, default=None)
     args = parser.parse_args()
-    summary, fits, pdf, png = generate(read_raw(args.raw), args.output_prefix)
+    summary, fits, pdf, png = generate(
+        read_raw(args.raw), args.output_prefix, figures_dir=args.figures_dir
+    )
     print(
         f"Wrote {len(summary)} summary rows, {len(fits)} fits, "
         f"and figures {pdf} and {png}"

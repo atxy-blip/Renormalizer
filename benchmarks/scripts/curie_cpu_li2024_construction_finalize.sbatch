@@ -27,14 +27,16 @@ export MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/matplotlib-construction-${USER}}
 REPO_DIR=${REPO_DIR:-/curie-home/yuxiong/Reno-quantity}
 RESULT_ROOT=${RESULT_ROOT:-benchmarks/results/operator_env_scaling/li2024_construction}
 FINAL_ROOT=${FINAL_ROOT:-benchmarks/results/operator_env_scaling/final}
+FIGURES_DIR=${FIGURES_DIR:-benchmarks/results/operator_env_scaling/figures}
 MANIFEST=${MANIFEST:-${RESULT_ROOT}/manifest.tsv}
 SNAPSHOT_DIR=${SNAPSHOT_DIR:-${RESULT_ROOT}/snapshots}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-${FINAL_ROOT}/li2024_spin_boson_20260713}
 
 cd "$REPO_DIR"
-mkdir -p "$RESULT_ROOT/logs"
+mkdir -p "$RESULT_ROOT/logs" "$FIGURES_DIR"
 
 python -u -m benchmarks.finalize_li2024_construction \
     --manifest "$MANIFEST" \
     --snapshot-dir "$SNAPSHOT_DIR" \
-    --output-prefix "$OUTPUT_PREFIX"
+    --output-prefix "$OUTPUT_PREFIX" \
+    --figures-dir "$FIGURES_DIR"

@@ -27,9 +27,12 @@ export MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/matplotlib-stage-${USER}}
 REPO_DIR=${REPO_DIR:-/curie-home/yuxiong/Reno-quantity}
 RAW=${RAW:-benchmarks/results/operator_env_scaling/li2024_formal/li2024_formal_raw.csv}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713}
+FIGURES_DIR=${FIGURES_DIR:-benchmarks/results/operator_env_scaling/figures}
 
 cd "$REPO_DIR"
+mkdir -p "$FIGURES_DIR"
 
 python -u -m benchmarks.analyze_li2024_stage_breakdown \
     --raw "$RAW" \
-    --output-prefix "$OUTPUT_PREFIX"
+    --output-prefix "$OUTPUT_PREFIX" \
+    --figures-dir "$FIGURES_DIR"

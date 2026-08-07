@@ -300,7 +300,7 @@ def plot(summary, pdf_path, figure_mode="main"):
     return pdf, png
 
 
-def generate(rows, output_prefix, figure_mode="main"):
+def generate(rows, output_prefix, figure_mode="main", figures_dir=None):
     if figure_mode not in ("main", "si"):
         raise ValueError(f"unsupported figure_mode: {figure_mode!r}")
     ok_rows = [row for row in rows if row.get("status") == "ok"]
@@ -319,10 +319,14 @@ def generate(rows, output_prefix, figure_mode="main"):
     _write_csv(fits_path, fits)
     if figure_mode == "main":
         _write_csv(output_prefix.with_name(output_prefix.name + "_summary.csv"), summary)
-    pdf_path = output_prefix.with_name(
-        output_prefix.name
-        + ("_scaling_three_panel.pdf" if figure_mode == "main" else "_si_scaling_three_panel.pdf")
-    )
+    if figures_dir is None:
+        pdf_path = output_prefix.with_name(
+            output_prefix.name
+            + ("_scaling_three_panel.pdf" if figure_mode == "main" else "_si_scaling_three_panel.pdf")
+        )
+    else:
+        stem = "li2024_modes_main_scaling" if figure_mode == "main" else "li2024_si_scaling"
+        pdf_path = Path(figures_dir) / (stem + ".pdf")
     pdf, png = plot(summary, pdf_path, figure_mode=figure_mode)
     return summary, fits, pdf, png
 
@@ -331,8 +335,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw", type=Path, required=True)
     parser.add_argument("--output-prefix", type=Path, required=True)
+    parser.add_argument("--figures-dir", type=Path, default=None)
     args = parser.parse_args()
-    summary, fits, pdf, png = generate(read_raw(args.raw), args.output_prefix)
+    summary, fits, pdf, png = generate(
+        read_raw(args.raw), args.output_prefix, figures_dir=args.figures_dir
+    )
     print(
         f"Wrote {len(summary)} summary rows, {len(fits)} fits, "
         f"and figures {pdf} and {png}"

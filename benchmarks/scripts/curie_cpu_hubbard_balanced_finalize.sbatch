@@ -27,14 +27,16 @@ export MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/matplotlib-hubbard-${USER}}
 REPO_DIR=${REPO_DIR:-/curie-home/yuxiong/Reno-quantity}
 RESULT_ROOT=${RESULT_ROOT:-benchmarks/results/operator_env_scaling/hubbard_balanced}
 FINAL_ROOT=${FINAL_ROOT:-benchmarks/results/operator_env_scaling/final}
+FIGURES_DIR=${FIGURES_DIR:-benchmarks/results/operator_env_scaling/figures}
 MANIFEST=${MANIFEST:-${RESULT_ROOT}/manifest.tsv}
 SNAPSHOT_DIR=${SNAPSHOT_DIR:-${RESULT_ROOT}/snapshots}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-${FINAL_ROOT}/hubbard_junction_20260806}
 
 cd "$REPO_DIR"
-mkdir -p "$RESULT_ROOT/logs"
+mkdir -p "$RESULT_ROOT/logs" "$FIGURES_DIR"
 
 python -u -m benchmarks.finalize_hubbard_balanced \
     --manifest "$MANIFEST" \
     --snapshot-dir "$SNAPSHOT_DIR" \
-    --output-prefix "$OUTPUT_PREFIX"
+    --output-prefix "$OUTPUT_PREFIX" \
+    --figures-dir "$FIGURES_DIR"

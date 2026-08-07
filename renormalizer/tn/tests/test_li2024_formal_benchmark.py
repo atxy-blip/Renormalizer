@@ -244,6 +244,26 @@ def test_li2024_si_outputs_keep_parameter_exponents(tmp_path):
     assert png.name == "li2024_si_scaling_three_panel.png"
 
 
+def test_li2024_main_si_figures_dir_contract(tmp_path):
+    rows = []
+    for method in FORMAL_METHODS:
+        for value in (4, 8):
+            rows.append(_synthetic_row("modes", method, value, 1.0))
+    figures_dir = tmp_path / "figs"
+    _, _, main_pdf, main_png = generate(
+        rows, tmp_path / "li2024", figure_mode="main", figures_dir=figures_dir
+    )
+    _, _, si_pdf, si_png = generate(
+        rows, tmp_path / "li2024", figure_mode="si", figures_dir=figures_dir
+    )
+    assert main_pdf.name == "li2024_modes_main_scaling.pdf"
+    assert main_png.name == "li2024_modes_main_scaling.png"
+    assert si_pdf.name == "li2024_si_scaling.pdf"
+    assert si_png.name == "li2024_si_scaling.png"
+    assert main_pdf.parent == figures_dir
+    assert si_pdf.parent == figures_dir
+
+
 def test_li2024_robustness_panels_keep_method_ranking():
     rows = []
     for panel in ("state_bond", "primitive_basis"):
