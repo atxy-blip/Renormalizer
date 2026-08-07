@@ -127,7 +127,9 @@ SI 保留 largest-four fits 与幂次参考线，供审稿人复核。
 ![Hubbard balanced scaling](../benchmarks/results/operator_env_scaling/figures/hubbard_balanced_scaling.png)
 
 **状态**：42/45 snapshots 完成，全部 `status=ok`，相对误差 ≤1.2e-14；唯一
-缺失是 (64,16) 的 `sop_no_env` 三个 repeat（运行时间过长，仍在执行）。
+缺失是 (64,16) 的 `sop_no_env` 三个 repeat（预计单点约 10⁴ 秒量级，按
+2026-08-07 决定冻结当前版本，不再等待）。本报告 Hubbard 结论以该 42/45
+版本为准。
 
 **结果**（largest-four log-log 拟合 vs `N_total = 4·n_lead + 2 + n_phonon`）：
 
@@ -167,7 +169,7 @@ benchmarks/results/operator_env_scaling/figures/
   li2024_si_scaling.{pdf,png}                # SI 全指数图
   li2024_si_stage_breakdown.{pdf,png}        # SI 阶段分解
   li2024_si_construction_scaling.{pdf,png}   # SI 构造成本
-  hubbard_balanced_scaling.{pdf,png}         # Hubbard balanced（待 finalize）
+  hubbard_balanced_scaling.{pdf,png}         # Hubbard balanced（42/45 部分结果）
 ```
 
 summary/fits CSV 保留在
