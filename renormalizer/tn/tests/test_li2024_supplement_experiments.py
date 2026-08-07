@@ -9,6 +9,14 @@ from benchmarks.analyze_li2024_stage_breakdown import (
     generate as generate_stage,
     summarize_modes,
 )
+from benchmarks.analyze_hubbard_cost_metrics import (
+    compute_fits as compute_cost_fits,
+    generate as generate_cost_metrics,
+)
+from benchmarks.analyze_hubbard_mechanism import (
+    compute_fits as compute_mechanism_fits,
+    measure_point,
+)
 from benchmarks.finalize_li2024_construction import generate as generate_construction
 from benchmarks.finalize_hubbard_balanced import (
     FORMAL_METHODS as HUBBARD_METHODS,
@@ -252,3 +260,56 @@ def test_hubbard_balanced_finalizer_accepts_ok_rows(tmp_path):
     assert len(fits) == 3
     assert pdf.name == "hubbard_hubbard_scaling.pdf"
     assert png.name == "hubbard_hubbard_scaling.png"
+
+
+def test_hubbard_mechanism_small_point():
+    row = measure_point(n_lead=1, n_phonon=1, primitive_basis=2)
+    assert row["n_sop_terms"] >= 1
+    assert row["support_mean"] >= 1.0
+    assert row["support_max"] >= row["support_mean"]
+    assert row["sop_local_factors"] > 0
+    assert row["ttno_tensor_elements"] > 0
+    assert row["compression_ratio"] > 0
+    assert row["ttno_max_bond"] >= 1
+
+
+def test_hubbard_mechanism_fits_from_synthetic_rows():
+    rows = []
+    for n_lead, n_phonon in ((4, 1), (8, 2), (16, 4), (32, 8), (64, 16)):
+        n_total = 4 * n_lead + 2 + n_phonon
+        rows.append({
+            "n_total_sites": n_total,
+            "sop_local_factors": 10 * n_total**2,
+            "ttno_tensor_elements": 100 * n_total,
+            "support_mean": 2.0 * n_total**0.5,
+            "support_max": 3.0 * n_total,
+        })
+    fits = compute_mechanism_fits(rows)
+    assert {fit["quantity"] for fit in fits} == {
+        "sop_local_factors", "ttno_tensor_elements", "support_mean", "support_max"
+    }
+    by_quantity = {fit["quantity"]: fit for fit in fits}
+    assert abs(by_quantity["sop_local_factors"]["alpha"] - 2.0) < 0.05
+    assert abs(by_quantity["ttno_tensor_elements"]["alpha"] - 1.0) < 0.05
+
+
+def test_hubbard_cost_metrics_artifacts(tmp_path):
+    rows = []
+    for task in hubbard_balanced_tasks(repeats=1):
+        rows.append({
+            **asdict(task),
+            "n_total_sites": task.n_total_sites,
+            "time_total_mean_sec": 0.1 * task.n_total_sites,
+            "time_total_std_sec": 0.01,
+            "memory_peak_mean_mb": 1.0,
+            "relative_error_max_vs_ttno": 1e-15,
+        })
+    figures_dir = tmp_path / "figs"
+    metrics, fits, pdf, png = generate_cost_metrics(
+        rows, tmp_path / "hubbard", figures_dir=figures_dir
+    )
+    assert len(metrics) == 15
+    assert len(fits) == 3 * 3
+    assert pdf.name == "hubbard_cost_metrics.pdf"
+    assert png.name == "hubbard_cost_metrics.png"
+    assert pdf.parent == figures_dir

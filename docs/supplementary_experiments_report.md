@@ -199,7 +199,80 @@ SI 保留 largest-four fits 与幂次参考线，供审稿人复核。
 - fermionic Jordan-Wigner 串没有改变相对标度，说明 reuse 结构差异是
   表示层的普适性质，不是 spin-boson 或纯玻色模型的特殊现象。
 
-## 6. 总体启示与边界
+## 6. 机制分析：Jordan-Wigner 串与 SOP 开销（分子结）
+
+![Hubbard mechanism support](../benchmarks/results/operator_env_scaling/figures/hubbard_mechanism_support.png)
+
+**前提**：分子结的 lead→bridge hopping 项带 Jordan-Wigner `Z` 串，串长随
+lead mode 到 bridge 的距离增长；SOP 逐项应用时这些 `Z` 因子都要显式乘一遍，
+而 TTNO 把整条串吸收进 operator bond。
+
+**结果**（balanced 扫描 5 点）：
+
+| N_total | n_terms | support mean | support max | SOP 局域因子总数 | TTNO 张量元素 | TTNO max bond |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 19 | 52 | 2.88 | 6 | 150 | 3 794 | 7 |
+| 36 | 104 | 4.12 | 10 | 428 | 46 992 | 7 |
+| 70 | 208 | 6.58 | 18 | 1 368 | 94 138 | 7 |
+| 138 | 416 | 11.50 | 34 | 4 784 | 188 644 | 7 |
+| 274 | 832 | 21.35 | 66 | 17 760 | 377 838 | 7 |
+
+largest-four 指数（vs N_total）：
+
+| 量 | α | r² |
+| --- | ---: | ---: |
+| SOP 局域因子总数 | 1.837 | 1.000 |
+| TTNO 张量元素数 | 1.027 | 1.000 |
+| 平均 support length | 0.813 | 0.997 |
+| 最大 support length | 0.931 | 1.000 |
+
+**启示**：
+
+- JW 串使 SOP 的平均/最大 support length 随系统增长（α≈0.8–0.9），因此
+  SOP 的“局域因子总数”按约 N^1.84 超线性增长；no-env 再把每个因子
+  按 term × node 重算，最终形成 N³ 的 action 成本。
+- TTNO 张量元素按约 N^1.03 近线性增长，max bond 恒为 7：它没有消除
+  单个张量的大小（绝对值仍大于 SOP 因子计数），而是通过有界 bond 和
+  environment 复用把 action 成本压到 N 量级。因此“压缩”的正确表述是
+  **标度优势 + 结构共享**，不是“TTNO 存的元素更少”。
+- 这正是分子结区别于纯玻色模型的地方：fermionic JW 串是 SOP 开销的
+  主要放大器，也是 TTNO 收益最大的来源之一。
+
+## 7. 成本指标：单次 sweep、内存×时间与误差（分子结）
+
+![Hubbard cost metrics](../benchmarks/results/operator_env_scaling/figures/hubbard_cost_metrics.png)
+
+**前提**：all-node local action 之和就是一次完整 sweep 的 kernel 成本；
+真实 dynamics 会重复很多次 sweep，因此单次成本直接决定整条轨迹的开销。
+这里同时报告峰值内存、内存×时间乘积和相对误差，避免“省时间但耗内存”
+或“靠近似换速度”的质疑。
+
+**结果**（largest-four 指数 vs N_total）：
+
+| 方法 | time α | memory α | memory×time α | 最大相对误差 |
+| --- | ---: | ---: | ---: | ---: |
+| `sop_no_env` | 3.180 | 0.386 | 3.566 | 9.5e-15 |
+| `sop_mctdh_like_state_env` | 2.081 | 2.030 | 4.111 | 1.2e-14 |
+| `ttno_with_env` | 1.038 | 0.096 | 1.134 | 0（参考） |
+
+典型绝对值（N=274）：
+
+| 方法 | 单次 sweep | 峰值内存 | 内存×时间 |
+| --- | ---: | ---: | ---: |
+| `sop_mctdh_like_state_env` | 619 s | 792 MB | 4.9e5 MB·s |
+| `ttno_with_env` | 1.89 s | 13.9 MB | 26.4 MB·s |
+
+**启示**：
+
+- TTNO 在时间、内存两个轴上都占优，且内存×时间近线性（α≈1.13）；
+  strict state env 的内存按 N² 涨，使其内存×时间达到 N^4.1，是三个方法
+  中最“贵”的联合指标。
+- no-env 虽然省内存，但单次 sweep 时间按 N³ 涨；N=138 时一次 sweep 已需
+  约 1.6 小时，而 TTNO 不到 1 秒。
+- 三条路径最大相对误差 ≤1.2e-14，说明优势不是精度换来的；TTNO 作为
+  参考路径本身误差为 0，SOP 两条路径也保持机器精度。
+
+## 8. 总体启示与边界
 
 1. TTNO 的优势不是单一阶段或实现假象：apply 与 env 都近线性，内存亚线性，
    吞吐恒定，构造一次性成本可控。
