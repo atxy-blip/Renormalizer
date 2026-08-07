@@ -19,7 +19,7 @@
 - 刻意边界：不测完整 TDVP/传播步；不与 Heidelberg MCTDH 生产代码做
   head-to-head；构造成本在正式 action 图中不计时，单独用补充实验测量。
 - 正式数据：Li.W.2024 spin-boson 189/189 snapshots；construction 补充
-  63/63 snapshots；Hubbard balanced 补充实验进行中。
+  63/63 snapshots；Hubbard balanced 补充 42/45 snapshots（缺失点见第 5 节）。
 
 ## 1. 主文图：modes 标度（spin-boson，SI 用全指数版）
 
@@ -113,7 +113,7 @@ SI 保留 largest-four fits 与幂次参考线，供审稿人复核。
   operator storage 本身仍按 d² 增长（见 contraction diagnostics）；
   paired layout 的 d⁴ 已在诊断中单独确认。
 
-## 5. Hubbard junction balanced 补充实验（进行中）
+## 5. Hubbard junction balanced 补充实验
 
 **前提**：spin-boson 的 N_b³/N_b²/N_b 需要第二个物理模型佐证，避免被解读为
 模型特例。使用本论文的 Hubbard junction 分子结模型：
@@ -124,13 +124,29 @@ SI 保留 largest-four fits 与幂次参考线，供审稿人复核。
   （小尺寸下 symbolic 合并后以实际 `n_sop_terms` 为准）；
 - 固定 M_s=20、d=10、paired leaf，3 方法 × 3 repeats = 45 个 array tasks。
 
-**状态**：截至本报告生成，已完成 33/45（小尺寸点全部 ok，相对误差 ~1e-15）；
-finalize 作业在 array 结束后自动运行。
+![Hubbard balanced scaling](../benchmarks/results/operator_env_scaling/figures/hubbard_balanced_scaling.png)
 
-**预期启示**：
-- 若重现 N³/N²/N，说明 reuse 结构差异是表示层的普适性质；
-- 若指数偏离（例如 fermionic Jordan-Wigner 串使 strict SOP 更贵），则
-  说明 term 结构会改变 reuse 收益，这本身是论文值得讨论的边界。
+**状态**：42/45 snapshots 完成，全部 `status=ok`，相对误差 ≤1.2e-14；唯一
+缺失是 (64,16) 的 `sop_no_env` 三个 repeat（运行时间过长，仍在执行）。
+
+**结果**（largest-four log-log 拟合 vs `N_total = 4·n_lead + 2 + n_phonon`）：
+
+| 方法 | α | r² | 拟合窗口 |
+| --- | ---: | ---: | ---: |
+| `sop_no_env` | 3.180 | 0.995 | N=19–138（缺 N=274） |
+| `sop_mctdh_like_state_env` | 2.081 | 0.998 | N=36–274 |
+| `ttno_with_env` | 1.038 | 1.000 | N=36–274 |
+
+与 spin-boson 的 3.109 / 2.035 / 0.916 几乎一致。补充观测：
+
+- TTNO bond 在 N=19→274 全程保持 7，不随系统增长，说明 Hamiltonian 的
+  operator structure 在该模型中确实可以高效压缩；
+- TTNO 峰值内存约 11–14 MB（近似常数），strict state env 内存按 N² 涨到
+  约 792 MB，no-env 内存极小但时间按 N³ 涨；
+- 在 N=274（n_lead=64, n_phonon=16）处，TTNO 比 strict state env 快约
+  327 倍；no-env 该点仍在运行，按 α≈3.18 外推约为数小时量级；
+- fermionic Jordan-Wigner 串没有改变相对标度，说明 reuse 结构差异是
+  表示层的普适性质，不是 spin-boson 或纯玻色模型的特殊现象。
 
 ## 6. 总体启示与边界
 
