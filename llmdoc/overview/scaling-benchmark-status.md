@@ -94,7 +94,7 @@ quantity: local_effective_1site_apply_all_nodes
 
 ### 正式解释口径（2026-08-06）
 
-正文图 `li2024_spin_boson_20260713_scaling_three_panel.{pdf,png}`：
+正文图 `benchmarks/results/operator_env_scaling/figures/li2024_modes_main_scaling.{pdf,png}`：
 
 - `modes` panel 是唯一报 scaling 指数的面板（largest-four fit）：
 
@@ -115,11 +115,18 @@ quantity: local_effective_1site_apply_all_nodes
 指数与幂次参考线完整保留在 SI：
 
 ```text
-benchmarks/results/operator_env_scaling/final/
-  li2024_spin_boson_20260713_si_scaling_three_panel.pdf
-  li2024_spin_boson_20260713_si_scaling_three_panel.png
-  li2024_spin_boson_20260713_si_fits.csv
+benchmarks/results/operator_env_scaling/figures/
+  li2024_si_scaling.pdf
+  li2024_si_scaling.png
+  li2024_si_stage_breakdown.pdf
+  li2024_si_stage_breakdown.png
+  li2024_si_construction_scaling.pdf
+  li2024_si_construction_scaling.png
 ```
+
+SI fits 与 summary 仍位于
+`benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_*`
+（CSV 不入 git，由 Slurm finalizer 再生成）。
 
 SI 图中 M_s panel 保留 M_s^4 参考线，大 d panel 保留常数参考线。它们是有效
 wall-time 指数与参考线，不是渐近 FLOP 指数；isolated full-rank internal

@@ -653,8 +653,8 @@ summary 为什么从 189 变为 63：
 
 | 用途 | PDF | PNG 预览 |
 | --- | --- | --- |
-| 主文核心图 | [Li.W.2024 三方法标度图](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.pdf) | [预览](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.png) |
-| SI Figure S1 | [Li.W.2024 全指数三方法标度图](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_si_scaling_three_panel.pdf) | [预览](../../benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_si_scaling_three_panel.png) |
+| 主文核心图 | [Li.W.2024 三方法标度图](../../benchmarks/results/operator_env_scaling/figures/li2024_modes_main_scaling.pdf) | [预览](../../benchmarks/results/operator_env_scaling/figures/li2024_modes_main_scaling.png) |
+| SI Figure S1 | [Li.W.2024 全指数三方法标度图](../../benchmarks/results/operator_env_scaling/figures/li2024_si_scaling.pdf) | [预览](../../benchmarks/results/operator_env_scaling/figures/li2024_si_scaling.png) |
 | SI Figure S2 | [Complexity validation](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/complexity_validation.pdf) | [预览](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/complexity_validation.png) |
 | SI Figure S3 | [Model mechanism](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.pdf) | [预览](../../benchmarks/results/operator_env_scaling/contraction_diagnostics/figures/model_mechanism.png) |
 

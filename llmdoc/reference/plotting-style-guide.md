@@ -105,8 +105,8 @@ conda run -n reno-3.9 python -m benchmarks.plot_li2024_operator_scaling \
   --output-prefix benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713
 ```
 
-- `benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.pdf`
-- `benchmarks/results/operator_env_scaling/final/li2024_spin_boson_20260713_scaling_three_panel.png`
+- `benchmarks/results/operator_env_scaling/figures/li2024_modes_main_scaling.pdf`
+- `benchmarks/results/operator_env_scaling/figures/li2024_modes_main_scaling.png`
 
 Main/SI split (2026-08-06):
 
@@ -119,9 +119,9 @@ Main/SI split (2026-08-06):
   together with the main figure by the Slurm finalizer:
 
 ```text
-benchmarks/results/operator_env_scaling/final/
-  li2024_spin_boson_20260713_si_scaling_three_panel.pdf
-  li2024_spin_boson_20260713_si_scaling_three_panel.png
+benchmarks/results/operator_env_scaling/figures/
+  li2024_si_scaling.pdf
+  li2024_si_scaling.png
 ```
 
 The plot CLI (`python -m benchmarks.plot_li2024_operator_scaling ...`) defaults
