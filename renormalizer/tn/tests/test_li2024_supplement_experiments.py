@@ -22,6 +22,7 @@ from benchmarks.finalize_hubbard_balanced import (
     FORMAL_METHODS as HUBBARD_METHODS,
     generate as generate_hubbard,
 )
+from benchmarks.finalize_hubbard_pernode import generate as generate_pernode
 from benchmarks.hubbard_balanced_manifest import (
     BALANCED_PAIRS,
     HUBBARD_PRIMITIVE_BASIS,
@@ -30,6 +31,7 @@ from benchmarks.hubbard_balanced_manifest import (
     read_task as read_hubbard_task,
     write_manifest as write_hubbard_manifest,
 )
+from benchmarks.hubbard_pernode_manifest import PERNODE_POINTS, point_for_task
 from benchmarks.li2024_construction_manifest import (
     CONSTRUCTION_MODE_VALUES,
     CONSTRUCTION_PRIMITIVE_BASIS_VALUES,
@@ -45,6 +47,10 @@ from benchmarks.run_li2024_construction_point import (
     write_snapshot_atomic,
 )
 from benchmarks.run_hubbard_balanced_point import run_hubbard_balanced_point
+from benchmarks.run_hubbard_pernode_point import (
+    classify_tree_node,
+    compute_support_loads,
+)
 from types import SimpleNamespace
 
 
@@ -312,4 +318,65 @@ def test_hubbard_cost_metrics_artifacts(tmp_path):
     assert len(fits) == 3 * 3
     assert pdf.name == "hubbard_cost_metrics.pdf"
     assert png.name == "hubbard_cost_metrics.png"
+    assert pdf.parent == figures_dir
+
+
+def test_hubbard_pernode_manifest_points():
+    assert PERNODE_POINTS == ((8, 2), (16, 4))
+    assert point_for_task(0) == (8, 2)
+    assert point_for_task(1) == (16, 4)
+
+
+def test_hubbard_pernode_classification_and_loads():
+    from benchmarks.benchmark_adaptive_operator_env import build_hubbard_junction_case
+    from renormalizer.tn import SOPBaselineOperator
+
+    tree, terms, psi = build_hubbard_junction_case(
+        n_lead=1,
+        n_phonon=1,
+        max_phonon_basis=4,
+        force_phonon_basis=4,
+    )
+    roles = [classify_tree_node(node) for node in tree.node_list]
+    assert "bridge" in roles
+    assert "lead" in roles
+    assert "phonon" in roles
+    assert "internal" in roles
+
+    sop = SOPBaselineOperator.from_symbolic_terms(terms, tree)
+    loads = compute_support_loads(sop, psi)
+    assert sum(loads.values()) == sum(len(term.local_ops) for term in sop.terms)
+    assert len(loads) == len(psi.node_list)
+
+
+def test_hubbard_pernode_finalizer_artifacts(tmp_path):
+    def snapshot(n_lead, n_phonon):
+        return {
+            "status": "ok",
+            "task_id": 0 if n_lead == 8 else 1,
+            "n_lead": n_lead,
+            "n_phonon": n_phonon,
+            "n_total_sites": 4 * n_lead + 2 + n_phonon,
+            "rows": [
+                {
+                    "node_idx": idx,
+                    "node_role": role,
+                    "depth": idx % 5,
+                    "support_load": 1 + idx,
+                    "time_no_env_sec": 0.1 * (1 + idx) ** 2,
+                    "time_strict_env_sec": 0.01,
+                    "time_ttno_sec": 0.001,
+                }
+                for idx, role in enumerate(("lead", "phonon", "internal", "bridge"))
+            ],
+        }
+
+    snaps = [snapshot(8, 2), snapshot(16, 4)]
+    figures_dir = tmp_path / "figs"
+    flat, pdf, png = generate_pernode(
+        snaps, tmp_path / "hubbard", figures_dir=figures_dir
+    )
+    assert len(flat) == 8
+    assert pdf.name == "Fig_SI_PerNode_Profile.pdf"
+    assert png.name == "Fig_SI_PerNode_Profile.png"
     assert pdf.parent == figures_dir

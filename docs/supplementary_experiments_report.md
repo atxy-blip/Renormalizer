@@ -20,7 +20,7 @@
 其余全部进 SI，按 `../ttns-test` Nature 风格重绘：
 `Fig_SI_Li2024_Scaling`、`Fig_SI_Stage_Breakdown`、`Fig_SI_Construction`、
 `Fig_SI_JW_Mechanism`、`Fig_SI_Cost_Metrics`（时间/内存/内存×时间/加速比）、
-`Fig_SI_Hubbard_Scaling`。
+`Fig_SI_PerNode_Profile`、`Fig_SI_Hubbard_Scaling`。
 
 ## 0. 总前提与口径
 
@@ -318,7 +318,36 @@ largest-four 指数（vs N_total）：
 - 三条路径最大相对误差 ≤1.2e-14（机器精度），优势不是精度换来的；该结论
   只在文字中陈述，避免 log 尺度误差图夸大 1e-15→1e-14 的视觉增长。
 
-## 8. 总体启示与边界
+## 8. Per-node 画像：SOP no-env 的本质开销（分子结）
+
+![Hubbard per-node profile](../benchmarks/results/operator_env_scaling/figures/Fig_SI_PerNode_Profile.png)
+
+**前提**：如果 SOP 的慢只来自少数“长 JW 串”节点，它仍有优化的可能；per-node
+计时直接检验这一点。对 N=36 与 N=70 两个分子结点，统计每个 TTNS 节点的
+one-site local action 时间（strict/TTNO 的 environment 各构建一次，计时只
+覆盖作用本身）。
+
+**结果**（N=70，67 个节点）：
+
+| 方法 | 每节点均值 | 每节点中位数 | 每节点最大 |
+| --- | ---: | ---: | ---: |
+| `sop_no_env` | 2.90 s | 2.90 s | 2.99 s |
+| `sop_mctdh_like_state_env` | 0.044 s | 0.020 s | 0.106 s |
+| `ttno_with_env` | 0.00027 s | 0.00014 s | 0.0038 s |
+
+**关键观测**：
+
+- no-env 的每节点时间在所有节点上几乎完全一样（2.89–2.99 s），包括
+  `support_load=0` 的内部节点；对节点承载 term 数做 log-log 相关，
+  ρ≈0。也就是说 SOP no-env 的慢不是“某些节点局部负载高”，而是
+  **每个节点都要为每个 term 重算整棵子树**——这是作用方式的本质开销，
+  与节点局部结构无关。
+- strict state env 把每节点成本降到 0.02–0.1 s（bridge/内部节点稍高，
+  叶节点更低），TTNO 进一步降到 ~10⁻⁴ s 且几乎均匀。
+- 该结果与第 6 节机制互补：JW 串使每个 term 的遍历成本随 N 增长，而
+  no-env 在每个节点上都支付这份全局成本，两者共同构成 N³。
+
+## 9. 总体启示与边界
 
 1. TTNO 的优势不是单一阶段或实现假象：apply 与 env 都近线性，内存亚线性，
    吞吐恒定，构造一次性成本可控。
