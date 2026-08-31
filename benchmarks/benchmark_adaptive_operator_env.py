@@ -94,6 +94,13 @@ RAW_FIELDS = [
     "n_env_cache_entries",
     "memory_peak_mb",
     "relative_error_vs_ttno",
+    "ud_ev",
+    "ed_ev",
+    "lam_ev",
+    "omegac_cm1",
+    "tree_topology",
+    "orbital_layout",
+    "jw_ordering",
     "backend",
     "num_threads",
     "git_commit",
@@ -149,6 +156,33 @@ def _binary_or_dummy(basis_list, label, contract_primitive=False):
     ).root
 
 
+def _fermionic_dof_order(mode_with_e, layout: str) -> List[str]:
+    """Linear ordering of the fermionic dofs for a named orbital layout.
+
+    ``mode_with_e`` is the energy-sorted ``(mode, shifted energy)`` list of lead
+    modes; the two bridge spin-orbitals ``s^``/``s_`` are inserted at the cut
+    that is natural for the layout:
+
+    - ``"energy"``: lead modes in ascending shifted energy with the bridge pair
+      at the Fermi level, i.e. right after the last non-positive mode.  Spin-up
+      and spin-down modes are interleaved.  This is the layout of panels (a)
+      and (b).
+    - ``"spin_blocked"``: every spin-up mode (ascending energy), then the bridge
+      pair, then every spin-down mode.  Same modes and the same tree shape --
+      only which mode sits on which leaf changes.
+    """
+    if layout == "energy":
+        modes = [mode for mode, _ in mode_with_e]
+        split = sum(1 for _, energy in mode_with_e if energy <= 0)
+    elif layout == "spin_blocked":
+        up = [mode for mode, _ in mode_with_e if mode[1] == "^"]
+        down = [mode for mode, _ in mode_with_e if mode[1] == "_"]
+        modes, split = up + down, len(up)
+    else:
+        raise ValueError(f"Unsupported orbital_layout {layout!r}")
+    return modes[:split] + ["s^", "s_"] + modes[split:]
+
+
 def build_hubbard_junction_case(
     n_lead: int,
     n_phonon: int,
@@ -164,8 +198,40 @@ def build_hubbard_junction_case(
     max_phonon_basis: int = 4,
     force_phonon_basis: int = None,
     phonon_contract_primitive: bool = False,
+    tree_topology: str = "bridge_centered",
+    orbital_layout: str = "energy",
+    jw_ordering: str = "tree_order",
 ):
-    """Build the Hubbard junction tree, including the n_phonon=0 lead-only case."""
+    """Build the Hubbard junction tree, including the n_phonon=0 lead-only case.
+
+    ``tree_topology`` selects the tree layout used for the benchmark:
+
+    - ``"bridge_centered"``: the physics-aware layout with the two bridge spin
+      states at the center and the lead/phonon sectors on separate subtrees.
+    - ``"flattened_binary"``: a deliberately physics-agnostic binary MCTDH tree
+      over all modes (fermionic lead modes in shifted-energy order with the
+      bridge spins at their natural positions, phonon modes appended), used as
+      the "bad tree" control.
+    - ``"lead_split"``: binary bad-tree control with all lead modes in one
+      binary subtree and the bridge spins + phonons in another, so every
+      lead--bridge coupling crosses the root cut.
+
+    ``orbital_layout`` and ``jw_ordering`` are two *independent* orderings of
+    the same fermionic dofs (see :func:`_fermionic_dof_order`):
+
+    - ``orbital_layout`` decides which mode sits on which leaf of the tree.
+    - ``jw_ordering`` decides the linear order along which the Jordan-Wigner
+      strings are laid: ``"tree_order"`` re-derives the transformation for
+      whatever layout the tree uses, ``"energy_order"`` keeps the energy-sorted
+      strings regardless of the layout.
+
+    Every combination is an exact representation of the same fermionic
+    Hamiltonian (identical spectrum), but only ``"tree_order"`` keeps the
+    Jordan-Wigner strings contiguous along the tree, and hence the TTNO bond
+    dimension constant in the system size.  A stale ``"energy_order"`` string on
+    a ``"spin_blocked"`` tree makes the TTNO bond grow linearly with N while
+    leaving the SOP term list -- and therefore the SOP cost -- untouched.
+    """
 
     n_e_mode = n_lead
     omega_c = Quantity(omegac, "cm-1").as_au()
@@ -197,21 +263,19 @@ def build_hubbard_junction_case(
     ] + [(name, e) for i, e in enumerate(e_k_r) for name in (f"R_{i}", f"R^{i}")]
     mode_with_e.sort(key=lambda item: item[1])
 
-    basis = []
-    first_positive = True
-    for mode, energy in mode_with_e:
-        if energy > 0 and first_positive:
-            first_positive = False
-            basis.append(BasisHalfSpin("s^"))
-            basis.append(BasisHalfSpin("s_"))
-        basis.append(BasisHalfSpin(mode))
-    if first_positive:
-        basis.append(BasisHalfSpin("s^"))
-        basis.append(BasisHalfSpin("s_"))
-
-    dofs = [b.dofs[0] for b in basis]
+    dofs = _fermionic_dof_order(mode_with_e, orbital_layout)
+    basis = [BasisHalfSpin(dof) for dof in dofs]
     su_idx = dofs.index("s^")
-    spin_to_idx = {"^": su_idx, "_": su_idx + 1}
+
+    # Jordan-Wigner strings are laid along ``jw_dofs``, deliberately kept as a
+    # separate ordering from the tree layout ``dofs`` above.
+    if jw_ordering == "tree_order":
+        jw_dofs = list(dofs)
+    elif jw_ordering == "energy_order":
+        jw_dofs = _fermionic_dof_order(mode_with_e, "energy")
+    else:
+        raise ValueError(f"Unsupported jw_ordering {jw_ordering!r}")
+    jw_pos = {dof: i for i, dof in enumerate(jw_dofs)}
 
     basis_tree_l_root = _binary_or_dummy(basis[:su_idx], "EL-dummy")
     basis_tree_r_root = _binary_or_dummy(basis[su_idx + 2 :], "ER-dummy")
@@ -219,7 +283,6 @@ def build_hubbard_junction_case(
     ham_terms: List[Op] = []
     for mode, energy in mode_with_e:
         mu = mu_l if mode[0] == "L" else mu_r
-        s_idx = spin_to_idx[mode[1]]
         ham_terms.append(Op("+ -", mode, energy + mu))
 
         v2 = (
@@ -231,12 +294,11 @@ def build_hubbard_junction_case(
             / rho_e
         )
         coupling = np.sqrt(v2)
-        idx = dofs.index(mode)
-        z_idx = list(range(idx + 1, s_idx)) if idx < s_idx else list(range(s_idx + 1, idx))
-        z_dofs = [dofs[i] for i in z_idx]
         ele_dof = "s" + mode[1]
-        ham_terms.append(Op("+ " + "Z " * len(z_idx) + "-", [mode] + z_dofs + [ele_dof], coupling))
-        ham_terms.append(Op("- " + "Z " * len(z_idx) + "+", [mode] + z_dofs + [ele_dof], coupling))
+        lo, hi = sorted((jw_pos[mode], jw_pos[ele_dof]))
+        z_dofs = jw_dofs[lo + 1 : hi]
+        ham_terms.append(Op("+ " + "Z " * len(z_dofs) + "-", [mode] + z_dofs + [ele_dof], coupling))
+        ham_terms.append(Op("- " + "Z " * len(z_dofs) + "+", [mode] + z_dofs + [ele_dof], coupling))
 
     ham_terms.extend([
         Op("+ -", "s^", qn=[0, 0], factor=e_d),
@@ -280,13 +342,36 @@ def build_hubbard_junction_case(
         contract_primitive=phonon_contract_primitive,
     )
 
-    node1 = TreeNodeBasis([basis[su_idx]])
-    node1.add_child([basis_tree_l_root, basis_tree_r_root])
-    node2 = TreeNodeBasis([basis[su_idx + 1]])
-    node2.add_child([node1, basis_tree_phonon_root])
-    tree = BasisTree(node2)
+    if tree_topology == "flattened_binary":
+        # Physics-agnostic control tree: one generic binary MCTDH tree over all
+        # modes. The bridge spins sit wherever the sorted lead ordering places
+        # them and the phonons are appended at the end, so the Hamiltonian's
+        # Jordan-Wigner strings and the Holstein coupling acquire long support
+        # across the tree instead of staying within local subtrees.
+        tree = BasisTree.binary_mctdh(basis + basis_list_phonon, dummy_label="flat-dummy")
+    elif tree_topology == "bridge_centered":
+        node1 = TreeNodeBasis([basis[su_idx]])
+        node1.add_child([basis_tree_l_root, basis_tree_r_root])
+        node2 = TreeNodeBasis([basis[su_idx + 1]])
+        node2.add_child([node1, basis_tree_phonon_root])
+        tree = BasisTree(node2)
+    elif tree_topology == "lead_split":
+        # Binary bad-tree control: all lead modes in one binary subtree and the
+        # bridge spins + phonons in the other, so every lead--bridge coupling
+        # crosses the root cut and the TTNO root bond grows with n_lead.
+        lead_basis = basis[:su_idx] + basis[su_idx + 2 :]
+        mol_basis = [basis[su_idx], basis[su_idx + 1]] + basis_list_phonon
+        lead_root = _binary_or_dummy(lead_basis, "lead-dummy")
+        mol_root = _binary_or_dummy(mol_basis, "mol-dummy")
+        root = TreeNodeBasis([BasisDummy("root-dummy")])
+        root.add_child([lead_root, mol_root])
+        tree = BasisTree(root)
+    else:
+        raise ValueError(f"Unsupported tree_topology {tree_topology!r}")
 
-    condition = {dofs[i]: 1 for i in range(su_idx + 2, len(dofs))}
+    # Occupation pattern is fixed by the physics (the filled Fermi sea), not by
+    # where ``orbital_layout`` happens to put each mode on the tree.
+    condition = {mode: 1 for mode, energy in mode_with_e if energy > 0}
     condition["s^"] = 0 if initial_occupied else 1
     condition["s_"] = 0 if initial_occupied else 1
     psi = TTNS(tree, condition=condition)
@@ -811,7 +896,11 @@ def _active_nodes(psi, active_scope: str):
     raise ValueError(f"Unsupported active scope {active_scope!r}")
 
 
-def _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, active_scope, git_commit):
+def _point_metadata(
+    path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, active_scope, git_commit,
+    ud_ev=0.0, ed_ev=0.0, lam_ev=0.248, omegac_cm1=500.0, tree_topology="bridge_centered",
+    orbital_layout="energy", jw_ordering="tree_order",
+):
     n_fermion_sites = 4 * n_lead + 2
     n_boson_sites = n_phonon
     n_total_sites = n_fermion_sites + n_boson_sites
@@ -839,6 +928,13 @@ def _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_no
         "local_basis_summary": _local_dim_summary(tree),
         "active_node_idx": active_node_idx,
         "quantity": quantity,
+        "ud_ev": ud_ev,
+        "ed_ev": ed_ev,
+        "lam_ev": lam_ev,
+        "omegac_cm1": omegac_cm1,
+        "tree_topology": tree_topology,
+        "orbital_layout": orbital_layout,
+        "jw_ordering": jw_ordering,
         "backend": "cpu",
         "num_threads": os.environ.get("RENO_NUM_THREADS", ""),
         "git_commit": git_commit,
@@ -876,18 +972,36 @@ def _run_point(
     primitive_basis_dim: int = None,
     selected_methods=METHODS,
 ):
+    ud_ev = float(getattr(args, "hubbard_u", 0.0))
+    ed_ev = float(getattr(args, "hubbard_ed", 0.0))
+    lam_ev = float(getattr(args, "lam_ev", 0.248))
+    omegac_cm1 = float(getattr(args, "omegac_cm1", 500.0))
+    tree_topology = str(getattr(args, "tree_topology", "bridge_centered"))
+    orbital_layout = str(getattr(args, "orbital_layout", "energy"))
+    jw_ordering = str(getattr(args, "jw_ordering", "tree_order"))
     tree, terms, psi = build_hubbard_junction_case(
         n_lead,
         n_phonon,
+        ud=ud_ev,
+        ed=ed_ev,
+        lam=lam_ev,
+        omegac=omegac_cm1,
         max_phonon_basis=args.max_phonon_basis,
         force_phonon_basis=primitive_basis_dim,
+        tree_topology=tree_topology,
+        orbital_layout=orbital_layout,
+        jw_ordering=jw_ordering,
     )
     if state_bond_dim > 1:
         psi = TTNS.random(tree, qntot=0, m_max=state_bond_dim)
     sop = SOPBaselineOperator.from_symbolic_terms(terms, tree)
     ttno = TTNO(tree, terms)
     active_nodes = _active_nodes(psi, args.active_scope)
-    metadata = _point_metadata(path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, args.active_scope, git_commit)
+    metadata = _point_metadata(
+        path_name, n_lead, n_phonon, tree, psi, sop, ttno, active_nodes, args.active_scope, git_commit,
+        ud_ev=ud_ev, ed_ev=ed_ev, lam_ev=lam_ev, omegac_cm1=omegac_cm1, tree_topology=tree_topology,
+        orbital_layout=orbital_layout, jw_ordering=jw_ordering,
+    )
 
     rows = []
     selected_methods = tuple(selected_methods)
@@ -964,7 +1078,12 @@ def _scaling_points(args):
         leads = _parse_int_list(args.lead_values)
         paths.append(("lead_only", [_make_point(n, 0) for n in leads]))
     if args.scaling_path in ("balanced_lead_phonon", "all"):
-        paths.append(("balanced_lead_phonon", _parse_pairs(args.balanced_pairs)))
+        ms = int(getattr(args, "balanced_state_bond", 1))
+        d = getattr(args, "balanced_primitive_basis", None)
+        pairs = _parse_pairs(args.balanced_pairs)
+        if ms > 1 or d is not None:
+            pairs = [_make_point(n, m, ms, d) for n, m in pairs]
+        paths.append(("balanced_lead_phonon", pairs))
     if args.scaling_path in ("state_bond", "ren_variables", "ren_aux"):
         paths.append((
             "state_bond",
@@ -1162,6 +1281,12 @@ def run_benchmark(args):
     np.random.seed(RNG_SEED)
     git_commit = _git_commit()
     rows = []
+    requested_methods = getattr(args, "methods", None)
+    if requested_methods:
+        allowed = {m.strip() for m in requested_methods.split(",") if m.strip()}
+        selected_methods = tuple(m for m in METHODS if m in allowed)
+    else:
+        selected_methods = METHODS
 
     for path_name, initial_points in _scaling_points(args):
         points = list(initial_points)
@@ -1184,6 +1309,7 @@ def run_benchmark(args):
                         disabled_methods,
                         state_bond_dim=state_bond_dim,
                         primitive_basis_dim=primitive_basis_dim,
+                        selected_methods=selected_methods,
                     )
                 except Exception as exc:
                     repeat_rows = [{
@@ -1276,6 +1402,49 @@ def parse_args():
     parser.add_argument("--alpha-stability-tol", type=float, default=0.25)
     parser.add_argument("--max-phonon-basis", type=int, default=4)
     parser.add_argument("--active-scope", choices=["root", "all_nodes"], default="root")
+    parser.add_argument("--hubbard-u", type=float, default=0.0, help="Hubbard U_d (eV) on the bridge.")
+    parser.add_argument("--hubbard-ed", type=float, default=0.0, help="Bridge level E_d (eV).")
+    parser.add_argument("--lam-ev", type=float, default=0.248, help="Reorganization energy lambda (eV).")
+    parser.add_argument("--omegac-cm1", type=float, default=500.0, help="Ohmic phonon cutoff omega_c (cm-1).")
+    parser.add_argument(
+        "--tree-topology",
+        choices=["bridge_centered", "flattened_binary", "lead_split"],
+        default="bridge_centered",
+        help="Bridge-centered physics-aware tree, flattened-binary tree, or lead_split bad-tree control (all binary).",
+    )
+    parser.add_argument(
+        "--orbital-layout",
+        choices=["energy", "spin_blocked"],
+        default="energy",
+        help="Which lead mode sits on which leaf: ascending shifted energy with "
+             "spins interleaved (default), or all spin-up modes then all spin-down.",
+    )
+    parser.add_argument(
+        "--jw-ordering",
+        choices=["tree_order", "energy_order"],
+        default="tree_order",
+        help="Linear order along which the Jordan-Wigner strings are laid: "
+             "rebuilt to follow the tree layout (default), or kept in energy "
+             "order regardless of the layout. Same Hamiltonian either way; only "
+             "'tree_order' keeps the TTNO bond dimension constant in N.",
+    )
+    parser.add_argument(
+        "--balanced-state-bond",
+        type=int,
+        default=1,
+        help="State bond dimension M_s for balanced_lead_phonon points (random TTNS init when > 1).",
+    )
+    parser.add_argument(
+        "--balanced-primitive-basis",
+        type=int,
+        default=None,
+        help="Forced primitive phonon basis dimension d for balanced_lead_phonon points.",
+    )
+    parser.add_argument(
+        "--methods",
+        default=None,
+        help="Comma-separated subset of METHODS, e.g. 'ttno_with_env,sop_mctdh_like_state_env'.",
+    )
     parser.add_argument("--output", type=Path, default=RESULT_DIR / "adaptive_operator_env_raw.csv")
     parser.add_argument("--fit-output", type=Path, default=RESULT_DIR / "adaptive_operator_env_fits.csv")
     return parser.parse_args()
